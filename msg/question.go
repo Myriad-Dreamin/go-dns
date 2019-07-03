@@ -32,6 +32,7 @@ QCLASS          a two octet code that specifies the class of the query.
 */
 import "bytes"
 import "fmt"
+import "encoding/binary"
 
 type DNSQuestion struct {
 	Name  []byte
@@ -39,30 +40,11 @@ type DNSQuestion struct {
 	Class uint16
 }
 
-func (q *DNSQuestion) Read(bs []byte) (int, error) {
-	buffer := bytes.NewBuffer(bs)
-	var tempBuf bytes.Buffer
-	var cnt int
-	for {
-		temp, _ := buffer.ReadByte()
-		if temp == 0xc0 {
-			tempBuf.WriteByte(temp)
-			temp, _ := buffer.ReadByte()
-			tempBuf.WriteByte(temp)
-			break
-		} else {
-			tempBuf.WriteByte(temp)
-			if temp == 0 {
-				break
-			}
-			for i := 0; i < int(temp); i++ {
-				b, _ := buffer.ReadByte()
-				tempBuf.WriteByte(b)
-			}
-		}
-	}
-	q.Name = tempBuf.Bytes()
-	cnt += len(q.Name)
+func (q *DNSQuestion) ReadFrom(bs []byte, offset int) (int, error) {
+	var cnt, l int
+	q.Name, l = GetFullName(bs, offset)
+	cnt += l
+	buffer := bytes.NewBuffer(bs[offset+cnt:])
 	q.Type = uint16(BytesToInt(ReadnBytes(buffer, 2)))
 	cnt += 2
 	q.Class = uint16(BytesToInt(ReadnBytes(buffer, 2)))
@@ -71,10 +53,49 @@ func (q *DNSQuestion) Read(bs []byte) (int, error) {
 }
 
 func (q *DNSQuestion) Print() {
+	// fmt.Printf(
+	// 	"QuestionInfo:\nName:%x\nType:%d\nClass:%d\n\n",
+	// 	q.Name,
+	// 	q.Type,
+	// 	q.Class,
+	// )
 	fmt.Printf(
-		"QuestionInfo:\nName:%x\nType:%d\nClass:%d\n\n",
-		q.Name,
+		"QuestionInfo:\nName:%s\nType:%d\nClass:%d\n\n",
+		q.SName(),
 		q.Type,
 		q.Class,
 	)
+}
+
+func (q *DNSQuestion) SName() string {
+	var s string
+	var n, flag int
+	for i := 0; ; i++ {
+		n = int(q.Name[i])
+		if n == 0 {
+			break
+		} else {
+			if flag == 0 {
+				flag = 1
+			} else {
+				s += string('.')
+			}
+			for j := 0; j < n; j++ {
+				s += string(q.Name[i+1+j])
+			}
+			i = i + n
+		}
+	}
+	return s
+}
+
+func (q *DNSQuestion) ToBytes() []byte {
+	var buf bytes.Buffer
+	tmp := make([]byte, 2)
+	buf.Write(q.Name)
+	binary.BigEndian.PutUint16(tmp, q.Type)
+	buf.Write(tmp)
+	binary.BigEndian.PutUint16(tmp, q.Class)
+	buf.Write(tmp)
+	return buf.Bytes()
 }

@@ -112,6 +112,7 @@ ARCOUNT         an unsigned 16 bit integer specifying the number of
 */
 import "bytes"
 import "fmt"
+import "encoding/binary"
 
 type DNSHeader struct {
 	ID      uint16
@@ -148,7 +149,7 @@ func (h *DNSHeader) Read(bs []byte) (int, error) {
 
 func (h *DNSHeader) Print() {
 	fmt.Printf(
-		"HeaderInfo:\nID:%x\nFlags:%x\nquc:%x\nanc:%x\nauc:%x\nadc:%x\n\n",
+		"HeaderInfo:\nID:%x\nFlags:%x\nQDcount:%d\nANCount:%d\nNSCount:%d\nARCount:%d\n\n",
 		h.ID,
 		h.Flags,
 		h.QDCount,
@@ -158,20 +159,20 @@ func (h *DNSHeader) Print() {
 	)
 }
 
-func BytesToInt(bs []byte, val interface{}) int {
-	var res int32
-	for i := 0; i < len(bs); i++ {
-		x := uint8(bs[i])
-		res = (res << 8) + int32(x)
-	}
-	return int(res)
-}
-
-func ReadnBytes(buffer *bytes.Buffer, n int) ([]byte, error) {
-	res := new(bytes.Buffer)
-	for i := 0; i < n; i++ {
-		c, _ := buffer.ReadByte()
-		res.WriteByte(c)
-	}
-	return res.Bytes(), nil
+func (h *DNSHeader) ToBytes() []byte {
+	var buf bytes.Buffer
+	tmp := make([]byte, 2)
+	binary.BigEndian.PutUint16(tmp, h.ID)
+	buf.Write(tmp)
+	binary.BigEndian.PutUint16(tmp, h.Flags)
+	buf.Write(tmp)
+	binary.BigEndian.PutUint16(tmp, h.QDCount)
+	buf.Write(tmp)
+	binary.BigEndian.PutUint16(tmp, h.ANCount)
+	buf.Write(tmp)
+	binary.BigEndian.PutUint16(tmp, h.NSCount)
+	buf.Write(tmp)
+	binary.BigEndian.PutUint16(tmp, h.ARCount)
+	buf.Write(tmp)
+	return buf.Bytes()
 }

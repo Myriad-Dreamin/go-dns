@@ -5,6 +5,7 @@ go 1.12
 require (
 	github.com/Myriad-Dreamin/screenrus v1.0.0
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
+	github.com/nsf/gocode v0.0.0-20190302080247-5bee97b48836 // indirect
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/urfave/cli v1.20.0

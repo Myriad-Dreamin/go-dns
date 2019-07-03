@@ -50,6 +50,7 @@ RDATA           a variable length string of octets that describes the
 */
 import "bytes"
 import "fmt"
+import "encoding/binary"
 
 type DNSAnswer struct {
 	Name     []byte
@@ -60,30 +61,11 @@ type DNSAnswer struct {
 	RDData   []byte
 }
 
-func (a *DNSAnswer) Read(bs []byte) (int, error) {
-	buffer := bytes.NewBuffer(bs)
-	var tempBuf bytes.Buffer
-	var cnt int
-	for {
-		temp, _ := buffer.ReadByte()
-		if temp == 0xc0 {
-			tempBuf.WriteByte(temp)
-			temp, _ := buffer.ReadByte()
-			tempBuf.WriteByte(temp)
-			break
-		} else {
-			tempBuf.WriteByte(temp)
-			if temp == 0 {
-				break
-			}
-			for i := 0; i < int(temp); i++ {
-				b, _ := buffer.ReadByte()
-				tempBuf.WriteByte(b)
-			}
-		}
-	}
-	a.Name = tempBuf.Bytes()
-	cnt += len(a.Name)
+func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
+	var cnt, l int
+	a.Name, l = GetFullName(bs, offset)
+	cnt += l
+	buffer := bytes.NewBuffer(bs[offset+cnt:])
 	a.Type = uint16(BytesToInt(ReadnBytes(buffer, 2)))
 	cnt += 2
 	a.Class = uint16(BytesToInt(ReadnBytes(buffer, 2)))
@@ -98,13 +80,61 @@ func (a *DNSAnswer) Read(bs []byte) (int, error) {
 }
 
 func (a *DNSAnswer) Print() {
+	// fmt.Printf(
+	// 	"AnswerInfo:\nName:%x\nType:%d\nClass:%d\nTLL:%d\nRDLength:%d\nRDData:%x\n\n",
+	// 	a.Name,
+	// 	a.Type,
+	// 	a.Class,
+	// 	a.TTL,
+	// 	a.RDLength,
+	// 	a.RDData,
+	// )
 	fmt.Printf(
-		"AnswerInfo:\nName:%x\nType:%d\nClass:%d\nTLL:%d\nRDLength:%d\nRDData:%x\n\n",
-		a.Name,
+		"AnswerInfo:\nName:%s\nType:%d\nClass:%d\nTLL:%d\nRDLength:%d\nRDData:%x\n\n",
+		a.SName(),
 		a.Type,
 		a.Class,
 		a.TTL,
 		a.RDLength,
 		a.RDData,
 	)
+}
+
+func (a *DNSAnswer) SName() string {
+	var s string
+	var n, flag int
+	for i := 0; ; i++ {
+		n = int(a.Name[i])
+		if n == 0 {
+			break
+		} else {
+			if flag == 0 {
+				flag = 1
+			} else {
+				s += string('.')
+			}
+			for j := 0; j < n; j++ {
+				s += string(a.Name[i+1+j])
+			}
+			i = i + n
+		}
+	}
+	return s
+}
+
+func (a *DNSAnswer) ToBytes() []byte {
+	var buf bytes.Buffer
+	tmp2 := make([]byte, 2)
+	tmp4 := make([]byte, 4)
+	buf.Write(a.Name)
+	binary.BigEndian.PutUint16(tmp2, a.Type)
+	buf.Write(tmp2)
+	binary.BigEndian.PutUint16(tmp2, a.Class)
+	buf.Write(tmp2)
+	binary.BigEndian.PutUint32(tmp4, a.TTL)
+	buf.Write(tmp4)
+	binary.BigEndian.PutUint16(tmp2, a.RDLength)
+	buf.Write(tmp2)
+	buf.Write(a.RDData)
+	return buf.Bytes()
 }
