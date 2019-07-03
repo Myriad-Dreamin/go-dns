@@ -110,9 +110,11 @@ NSCOUNT         an unsigned 16 bit integer specifying the number of name
 ARCOUNT         an unsigned 16 bit integer specifying the number of
                 resource records in the additional records section.
 */
-import "bytes"
-import "fmt"
-import "encoding/binary"
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+)
 
 type DNSHeader struct {
 	ID      uint16
@@ -137,13 +139,39 @@ type DNSHeader struct {
 // }
 
 func (h *DNSHeader) Read(bs []byte) (int, error) {
+	var b []byte
+	var err error
 	buf := bytes.NewBuffer(bs)
-	h.ID = uint16(BytesToInt(ReadnBytes(buf, 2)))
-	h.Flags = uint16(BytesToInt(ReadnBytes(buf, 2)))
-	h.QDCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
-	h.ANCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
-	h.NSCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
-	h.ARCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
+	if b, err = ReadnBytes(buf, 2); err != nil {
+		return 0, err
+	}
+	h.ID = binary.BigEndian.Uint16(b)
+	if b, err = ReadnBytes(buf, 2); err != nil {
+		return 0, err
+	}
+	h.Flags = binary.BigEndian.Uint16(b)
+	if b, err = ReadnBytes(buf, 2); err != nil {
+		return 0, err
+	}
+	h.QDCount = binary.BigEndian.Uint16(b)
+	if b, err = ReadnBytes(buf, 2); err != nil {
+		return 0, err
+	}
+	h.ANCount = binary.BigEndian.Uint16(b)
+	if b, err = ReadnBytes(buf, 2); err != nil {
+		return 0, err
+	}
+	h.NSCount = binary.BigEndian.Uint16(b)
+	if b, err = ReadnBytes(buf, 2); err != nil {
+		return 0, err
+	}
+	h.ARCount = binary.BigEndian.Uint16(b)
+	// h.ID = uint16(BytesToInt())
+	// h.Flags = uint16(BytesToInt(ReadnBytes(buf, 2)))
+	// h.QDCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
+	// h.ANCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
+	// h.NSCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
+	// h.ARCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
 	return 12, nil
 }
 

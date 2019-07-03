@@ -25,26 +25,41 @@ type DNSMessage struct {
 
 func (m *DNSMessage) Read(bs []byte) (int, error) {
 	var offset int
-	cnt, _ := m.Header.Read(bs[offset:])
+	cnt, err := m.Header.Read(bs[offset:])
+	if err != nil {
+		return offset, err
+	}
 	offset += cnt
 	m.Question = make([]DNSQuestion, m.Header.QDCount)
 	for i := 0; i < int(m.Header.QDCount); i++ {
-		cnt, _ := m.Question[i].ReadFrom(bs, offset)
+		cnt, err := m.Question[i].ReadFrom(bs, offset)
+		if err != nil {
+			return offset, err
+		}
 		offset += cnt
 	}
 	m.Answer = make([]DNSAnswer, m.Header.ANCount)
 	for i := 0; i < int(m.Header.ANCount); i++ {
-		cnt, _ := m.Answer[i].ReadFrom(bs, offset)
+		cnt, err := m.Answer[i].ReadFrom(bs, offset)
+		if err != nil {
+			return offset, err
+		}
 		offset += cnt
 	}
 	m.Authority = make([]DNSAnswer, m.Header.NSCount)
 	for i := 0; i < int(m.Header.NSCount); i++ {
-		cnt, _ := m.Authority[i].ReadFrom(bs, offset)
+		cnt, err := m.Authority[i].ReadFrom(bs, offset)
+		if err != nil {
+			return offset, err
+		}
 		offset += cnt
 	}
 	m.Additional = make([]DNSAnswer, m.Header.ARCount)
 	for i := 0; i < int(m.Header.ARCount); i++ {
-		cnt, _ := m.Additional[i].ReadFrom(bs, offset)
+		cnt, err := m.Additional[i].ReadFrom(bs, offset)
+		if err != nil {
+			return offset, err
+		}
 		offset += cnt
 	}
 	return offset, nil
@@ -65,7 +80,6 @@ func (m *DNSMessage) Print() {
 		it.Print()
 	}
 }
-<<<<<<< HEAD
 
 func (m *DNSMessage) ToBytes() []byte {
 	var buf bytes.Buffer
@@ -84,5 +98,3 @@ func (m *DNSMessage) ToBytes() []byte {
 	}
 	return buf.Bytes()
 }
-=======
->>>>>>> da5afc8a2ac9b75c25edb7df63d7597e3c247518

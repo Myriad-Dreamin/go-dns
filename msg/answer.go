@@ -50,10 +50,7 @@ RDATA           a variable length string of octets that describes the
 */
 import "bytes"
 import "fmt"
-<<<<<<< HEAD
 import "encoding/binary"
-=======
->>>>>>> da5afc8a2ac9b75c25edb7df63d7597e3c247518
 
 type DNSAnswer struct {
 	Name     []byte
@@ -66,18 +63,38 @@ type DNSAnswer struct {
 
 func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
 	var cnt, l int
-	a.Name, l = GetFullName(bs, offset)
+	var b []byte
+	var err error
+	a.Name, l, err = GetFullName(bs, offset)
+	if err != nil {
+		return 0, err
+	}
 	cnt += l
 	buffer := bytes.NewBuffer(bs[offset+cnt:])
-	a.Type = uint16(BytesToInt(ReadnBytes(buffer, 2)))
+	if b, err = ReadnBytes(buffer, 2); err != nil {
+		return 0, err
+	}
+	a.Type = binary.BigEndian.Uint16(b)
 	cnt += 2
-	a.Class = uint16(BytesToInt(ReadnBytes(buffer, 2)))
+	if b, err = ReadnBytes(buffer, 2); err != nil {
+		return 0, err
+	}
+	a.Class = binary.BigEndian.Uint16(b)
 	cnt += 2
-	a.TTL = uint32(BytesToInt(ReadnBytes(buffer, 4)))
+	if b, err = ReadnBytes(buffer, 4); err != nil {
+		return 0, err
+	}
+	a.TTL = binary.BigEndian.Uint32(b)
 	cnt += 4
-	a.RDLength = uint16(BytesToInt(ReadnBytes(buffer, 2)))
+	if b, err = ReadnBytes(buffer, 2); err != nil {
+		return 0, err
+	}
+	a.RDLength = binary.BigEndian.Uint16(b)
 	cnt += 2
-	a.RDData, _ = ReadnBytes(buffer, int(a.RDLength))
+	a.RDData, err = ReadnBytes(buffer, int(a.RDLength))
+	if err != nil {
+		return 0, err
+	}
 	cnt += int(a.RDLength)
 	return cnt, nil
 }

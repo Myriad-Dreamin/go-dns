@@ -42,12 +42,22 @@ type DNSQuestion struct {
 
 func (q *DNSQuestion) ReadFrom(bs []byte, offset int) (int, error) {
 	var cnt, l int
-	q.Name, l = GetFullName(bs, offset)
+	var b []byte
+	var err error
+	if q.Name, l, err = GetFullName(bs, offset); err != nil {
+		return 0, err
+	}
 	cnt += l
 	buffer := bytes.NewBuffer(bs[offset+cnt:])
-	q.Type = uint16(BytesToInt(ReadnBytes(buffer, 2)))
+	if b, err = ReadnBytes(buffer, 2); err != nil {
+		return 0, err
+	}
+	q.Type = binary.BigEndian.Uint16(b)
 	cnt += 2
-	q.Class = uint16(BytesToInt(ReadnBytes(buffer, 2)))
+	if b, err = ReadnBytes(buffer, 2); err != nil {
+		return 0, err
+	}
+	q.Class = binary.BigEndian.Uint16(b)
 	cnt += 2
 	return cnt, nil
 }
