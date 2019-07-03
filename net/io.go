@@ -26,6 +26,14 @@ func NewIO() (rw *IO) {
 	}
 }
 
+func (rw *IO) SetBuffer(pb PacketableBuffer) {
+	rw.Buffer = pb
+}
+
+func (rw *IO) SetByteOrder(br binary.ByteOrder) {
+	rw.Endian = br
+}
+
 func NewIOObj(b interface{}) (rw *IO) {
 	rw = NewIO()
 	if err := rw.Write(b); err != nil {
