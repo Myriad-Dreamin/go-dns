@@ -2,8 +2,6 @@ package mdnet
 
 import "testing"
 import "encoding/hex"
-
-// import "encoding/binary"
 import "github.com/Myriad-Dreamin/go-dns/msg"
 
 // HeaderInfo:
@@ -43,6 +41,9 @@ import "github.com/Myriad-Dreamin/go-dns/msg"
 // RDLength:4
 // RDData:0ed7b126
 
+// Domain name: www.baidu.com
+// Domain name: www.a.shifen.com
+
 func TestDecodeHeader(t *testing.T) {
 	var hexData = "59ad818000010003000000000377777705626169647503636f6d0000010001c00c0005000100000005000f0377777701610673686966656ec016c02b000100010000000500040ed7b127c02b000100010000000500040ed7b126"
 	var bytesData, err = hex.DecodeString(hexData)
@@ -54,4 +55,6 @@ func TestDecodeHeader(t *testing.T) {
 
 	msgMessage.Read(bytesData)
 	msgMessage.Print()
+	msgMessage.Answer[0].SName()
+	msgMessage.Answer[1].SName()
 }
