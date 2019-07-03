@@ -148,8 +148,7 @@ func (h *DNSHeader) Read(bs []byte) (int, error) {
 }
 
 func (h *DNSHeader) Print() {
-	fmt.Printf(
-		"HeaderInfo:\nID:%x\nFlags:%x\nQDcount:%d\nANCount:%d\nNSCount:%d\nARCount:%d\n\n",
+	fmt.Printf("HeaderInfo:\nID:%x\nFlags:%x\nQDcount:%d\nANCount:%d\nNSCount:%d\nARCount:%d\n\n",
 		h.ID,
 		h.Flags,
 		h.QDCount,

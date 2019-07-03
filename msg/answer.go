@@ -50,7 +50,10 @@ RDATA           a variable length string of octets that describes the
 */
 import "bytes"
 import "fmt"
+<<<<<<< HEAD
 import "encoding/binary"
+=======
+>>>>>>> da5afc8a2ac9b75c25edb7df63d7597e3c247518
 
 type DNSAnswer struct {
 	Name     []byte

@@ -65,6 +65,7 @@ func (m *DNSMessage) Print() {
 		it.Print()
 	}
 }
+<<<<<<< HEAD
 
 func (m *DNSMessage) ToBytes() []byte {
 	var buf bytes.Buffer
@@ -83,3 +84,5 @@ func (m *DNSMessage) ToBytes() []byte {
 	}
 	return buf.Bytes()
 }
+=======
+>>>>>>> da5afc8a2ac9b75c25edb7df63d7597e3c247518
