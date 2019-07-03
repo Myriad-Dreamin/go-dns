@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 
+	scrlog "github.com/Myriad-Dreamin/screenrus"
+	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	urcli "github.com/urfave/cli"
 )
 
@@ -22,16 +24,39 @@ type ServerX struct {
 	// submodules
 	serve *ServerCmd
 
-	logfiledir string
-	logfile    *os.File
-	logger     *log.Logger
-
-	port int
+	logToScreen   bool
+	logfiledir    string
+	logfile       *os.File
+	loggerFactory *log.Logger
+	logger        *log.Entry
 }
 
-func (srv *ServerX) SetLog(rd io.Writer) {
-	srv.logger = log.New(rd, "", log.LstdFlags|log.Lshortfile)
-	srv.logger.SetFlags(log.LstdFlags | log.Lshortfile)
+var screenLog, _ = scrlog.NewScreenLogPlugin(nil)
+
+func (srv *ServerX) SetRootLogger(rd io.Writer) {
+	srv.loggerFactory = log.New()
+	srv.loggerFactory.Out = rd
+	if srv.logToScreen {
+		srv.loggerFactory.AddHook(screenLog)
+	}
+
+	srv.logger = srv.loggerFactory.WithFields(logrus.Fields{
+		"prog": "cmd",
+	})
+}
+
+func (srv *ServerX) RequestRootLogger() *log.Logger {
+	return srv.loggerFactory
+}
+
+func (srv *ServerX) SetLog(loggerFactory *log.Logger) {
+	srv.loggerFactory = loggerFactory
+	if srv.logToScreen {
+		srv.loggerFactory.AddHook(screenLog)
+	}
+	srv.logger = srv.loggerFactory.WithFields(logrus.Fields{
+		"prog": "cmd",
+	})
 }
 
 func (srv *ServerX) Before(c *urcli.Context) (err error) {
@@ -40,7 +65,7 @@ func (srv *ServerX) Before(c *urcli.Context) (err error) {
 		srv.logfile = nil
 		return err
 	}
-	srv.SetLog(srv.logfile)
+	srv.SetRootLogger(srv.logfile)
 	return nil
 }
 
@@ -67,6 +92,11 @@ func (srv *ServerX) Init() {
 			Value:       "prog.log",
 			Usage:       "logger address",
 			Destination: &srv.logfiledir,
+		},
+		urcli.BoolFlag{
+			Name:        "logtoscr, lscr",
+			Usage:       "logger to screen",
+			Destination: &srv.logToScreen,
 		},
 	}
 	urcli.HelpFlag = urcli.BoolFlag{
@@ -100,7 +130,7 @@ func NewServerX() *ServerX {
 func (srv *ServerX) Run() {
 	if err := srv.handler.Run(os.Args); err != nil {
 		if srv.logger == nil {
-			srv.SetLog(os.Stdout)
+			srv.SetRootLogger(os.Stdout)
 		}
 		srv.logger.Fatal(err)
 	}

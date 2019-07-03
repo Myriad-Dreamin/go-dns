@@ -3,19 +3,27 @@ package main
 import (
 	"fmt"
 
+	log "github.com/sirupsen/logrus"
 	urcli "github.com/urfave/cli"
 )
 
 type ServerCmd struct {
-	srv *ServerX
+	srv    *ServerX
+	logger *log.Entry
+
 	cmd *urcli.Command
 
 	port int
 	host string
 }
 
+func (srv *ServerCmd) RequestRootLogger() *log.Logger {
+	return srv.srv.RequestRootLogger()
+}
+
 func (serve *ServerCmd) Before(c *urcli.Context) (err error) {
 	fmt.Println("serve Before")
+	serve.logger = serve.srv.logger
 	return nil
 }
 
@@ -50,7 +58,7 @@ func NewServerCmd(dnsSrv *ServerX) *ServerCmd {
 				Destination: &serve.port,
 			},
 			urcli.StringFlag{
-				Name:        "port, p",
+				Name:        "host",
 				Value:       "114.114.114.114",
 				Usage:       "parent dns address",
 				Destination: &serve.host,
