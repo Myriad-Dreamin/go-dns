@@ -6,7 +6,6 @@ import (
 	"os"
 
 	scrlog "github.com/Myriad-Dreamin/screenrus"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	urcli "github.com/urfave/cli"
 )
@@ -40,7 +39,7 @@ func (srv *ServerX) SetRootLogger(rd io.Writer) {
 		srv.loggerFactory.AddHook(screenLog)
 	}
 
-	srv.logger = srv.loggerFactory.WithFields(logrus.Fields{
+	srv.logger = srv.loggerFactory.WithFields(log.Fields{
 		"prog": "cmd",
 	})
 }
@@ -54,7 +53,7 @@ func (srv *ServerX) SetLog(loggerFactory *log.Logger) {
 	if srv.logToScreen {
 		srv.loggerFactory.AddHook(screenLog)
 	}
-	srv.logger = srv.loggerFactory.WithFields(logrus.Fields{
+	srv.logger = srv.loggerFactory.WithFields(log.Fields{
 		"prog": "cmd",
 	})
 }

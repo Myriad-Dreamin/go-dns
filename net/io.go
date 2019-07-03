@@ -38,6 +38,10 @@ func (rw *IO) Write(b interface{}) error {
 	return binary.Write(rw.Buffer, rw.Endian, b)
 }
 
+func (rw *IO) Read(b interface{}) error {
+	return binary.Read(rw.Buffer, rw.Endian, b)
+}
+
 func (rw *IO) Bytes() []byte {
 	return rw.Buffer.Bytes()
 }

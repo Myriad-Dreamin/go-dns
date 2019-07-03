@@ -4,7 +4,6 @@ import (
 	"net"
 	"sync"
 
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -17,7 +16,7 @@ type Server struct {
 }
 
 func (srv *Server) SetLogger(mLogger *log.Logger) {
-	srv.logger = mLogger.WithFields(logrus.Fields{
+	srv.logger = mLogger.WithFields(log.Fields{
 		"prog": "server",
 	})
 }
@@ -52,7 +51,7 @@ func (srv *Server) ListenAndServe(port, host string) (err error) {
 		err = srv.tryDisonnectFromRemoteDNSServer()
 	}()
 
-	srv.logger.Infof("tcp socket set up successfully")
+	srv.logger.Infof("udp socket set up successfully")
 
 	return nil
 }
