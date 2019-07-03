@@ -30,8 +30,51 @@ QTYPE           a two octet code which specifies the type of the query.
 QCLASS          a two octet code that specifies the class of the query.
                 For example, the QCLASS field is IN for the Internet.
 */
+import "bytes"
+import "fmt"
+
 type DNSQuestion struct {
 	Name  []byte
 	Type  uint16
 	Class uint16
+}
+
+func (q *DNSQuestion) Read(bs []byte) (int, error) {
+	buffer := bytes.NewBuffer(bs)
+	var tempBuf bytes.Buffer
+	var cnt int
+	for {
+		temp, _ := buffer.ReadByte()
+		if temp == 0xc0 {
+			tempBuf.WriteByte(temp)
+			temp, _ := buffer.ReadByte()
+			tempBuf.WriteByte(temp)
+			break
+		} else {
+			tempBuf.WriteByte(temp)
+			if temp == 0 {
+				break
+			}
+			for i := 0; i < int(temp); i++ {
+				b, _ := buffer.ReadByte()
+				tempBuf.WriteByte(b)
+			}
+		}
+	}
+	q.Name = tempBuf.Bytes()
+	cnt += len(q.Name)
+	q.Type = uint16(BytesToInt(ReadnBytes(buffer, 2)))
+	cnt += 2
+	q.Class = uint16(BytesToInt(ReadnBytes(buffer, 2)))
+	cnt += 2
+	return cnt, nil
+}
+
+func (q *DNSQuestion) Print() {
+	fmt.Printf(
+		"QuestionInfo:\nName:%x\nType:%d\nClass:%d\n\n",
+		q.Name,
+		q.Type,
+		q.Class,
+	)
 }

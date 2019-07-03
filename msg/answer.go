@@ -48,6 +48,9 @@ RDATA           a variable length string of octets that describes the
                 For example, the if the TYPE is A and the CLASS is IN,
                 the RDATA field is a 4 octet ARPA Internet address.
 */
+import "bytes"
+import "fmt"
+
 type DNSAnswer struct {
 	Name     []byte
 	Type     uint16
@@ -55,4 +58,53 @@ type DNSAnswer struct {
 	TTL      uint32
 	RDLength uint16
 	RDData   []byte
+}
+
+func (a *DNSAnswer) Read(bs []byte) (int, error) {
+	buffer := bytes.NewBuffer(bs)
+	var tempBuf bytes.Buffer
+	var cnt int
+	for {
+		temp, _ := buffer.ReadByte()
+		if temp == 0xc0 {
+			tempBuf.WriteByte(temp)
+			temp, _ := buffer.ReadByte()
+			tempBuf.WriteByte(temp)
+			break
+		} else {
+			tempBuf.WriteByte(temp)
+			if temp == 0 {
+				break
+			}
+			for i := 0; i < int(temp); i++ {
+				b, _ := buffer.ReadByte()
+				tempBuf.WriteByte(b)
+			}
+		}
+	}
+	a.Name = tempBuf.Bytes()
+	cnt += len(a.Name)
+	a.Type = uint16(BytesToInt(ReadnBytes(buffer, 2)))
+	cnt += 2
+	a.Class = uint16(BytesToInt(ReadnBytes(buffer, 2)))
+	cnt += 2
+	a.TTL = uint32(BytesToInt(ReadnBytes(buffer, 4)))
+	cnt += 4
+	a.RDLength = uint16(BytesToInt(ReadnBytes(buffer, 2)))
+	cnt += 2
+	a.RDData, _ = ReadnBytes(buffer, int(a.RDLength))
+	cnt += int(a.RDLength)
+	return cnt, nil
+}
+
+func (a *DNSAnswer) Print() {
+	fmt.Printf(
+		"AnswerInfo:\nName:%x\nType:%d\nClass:%d\nTLL:%d\nRDLength:%d\nRDData:%x\n\n",
+		a.Name,
+		a.Type,
+		a.Class,
+		a.TTL,
+		a.RDLength,
+		a.RDData,
+	)
 }

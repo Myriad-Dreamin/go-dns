@@ -110,6 +110,9 @@ NSCOUNT         an unsigned 16 bit integer specifying the number of name
 ARCOUNT         an unsigned 16 bit integer specifying the number of
                 resource records in the additional records section.
 */
+import "bytes"
+import "fmt"
+
 type DNSHeader struct {
 	ID      uint16
 	Flags   uint16
@@ -117,4 +120,58 @@ type DNSHeader struct {
 	ANCount uint16
 	NSCount uint16
 	ARCount uint16
+}
+
+// func (h *DNSHeader) Read(r io.ReadWriter) error {
+// 	var bs []byte
+// 	r.Read(bs)
+// 	buf := bytes.NewBuffer(bs)
+// 	h.ID = uint16(BytesToInt(ReadnBytes(buf, 2)))
+// 	h.Flags = uint16(BytesToInt(ReadnBytes(buf, 2)))
+// 	h.QDCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
+// 	h.ANCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
+// 	h.NSCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
+// 	h.ARCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
+// 	return nil
+// }
+
+func (h *DNSHeader) Read(bs []byte) (int, error) {
+	buf := bytes.NewBuffer(bs)
+	h.ID = uint16(BytesToInt(ReadnBytes(buf, 2)))
+	h.Flags = uint16(BytesToInt(ReadnBytes(buf, 2)))
+	h.QDCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
+	h.ANCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
+	h.NSCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
+	h.ARCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
+	return 12, nil
+}
+
+func (h *DNSHeader) Print() {
+	fmt.Printf(
+		"HeaderInfo:\nID:%x\nFlags:%x\nquc:%x\nanc:%x\nauc:%x\nadc:%x\n\n",
+		h.ID,
+		h.Flags,
+		h.QDCount,
+		h.ANCount,
+		h.NSCount,
+		h.ARCount,
+	)
+}
+
+func BytesToInt(bs []byte, val interface{}) int {
+	var res int32
+	for i := 0; i < len(bs); i++ {
+		x := uint8(bs[i])
+		res = (res << 8) + int32(x)
+	}
+	return int(res)
+}
+
+func ReadnBytes(buffer *bytes.Buffer, n int) ([]byte, error) {
+	res := new(bytes.Buffer)
+	for i := 0; i < n; i++ {
+		c, _ := buffer.ReadByte()
+		res.WriteByte(c)
+	}
+	return res.Bytes(), nil
 }
