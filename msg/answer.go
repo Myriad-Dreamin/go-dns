@@ -48,9 +48,12 @@ RDATA           a variable length string of octets that describes the
                 For example, the if the TYPE is A and the CLASS is IN,
                 the RDATA field is a 4 octet ARPA Internet address.
 */
-import "bytes"
-import "fmt"
-import "encoding/binary"
+import (
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"fmt"
+)
 
 type DNSAnswer struct {
 	Name     []byte
@@ -109,9 +112,14 @@ func (a *DNSAnswer) Print() {
 	// 	a.RDLength,
 	// 	a.RDData,
 	// )
+	sname, err := a.SName()
+	if err != nil {
+		fmt.Println("Wrong DNSAnswer format")
+		return
+	}
 	fmt.Printf(
 		"AnswerInfo:\nName:%s\nType:%d\nClass:%d\nTLL:%d\nRDLength:%d\nRDData:%x\n\n",
-		a.SName(),
+		sname,
 		a.Type,
 		a.Class,
 		a.TTL,
@@ -120,10 +128,14 @@ func (a *DNSAnswer) Print() {
 	)
 }
 
-func (a *DNSAnswer) SName() string {
+func (a *DNSAnswer) SName() (string, error) {
 	var s string
-	var n, flag int
+	var n, l, flag int
+	l = len(a.Name)
 	for i := 0; ; i++ {
+		if i >= l {
+			return "", errors.New("Index out of range")
+		}
 		n = int(a.Name[i])
 		if n == 0 {
 			break
@@ -133,16 +145,19 @@ func (a *DNSAnswer) SName() string {
 			} else {
 				s += string('.')
 			}
+			if i+n+1 >= l {
+				return "", errors.New("Index out of range")
+			}
 			for j := 0; j < n; j++ {
 				s += string(a.Name[i+1+j])
 			}
 			i = i + n
 		}
 	}
-	return s
+	return s, nil
 }
 
-func (a *DNSAnswer) ToBytes() []byte {
+func (a *DNSAnswer) ToBytes() ([]byte, error) {
 	var buf bytes.Buffer
 	tmp2 := make([]byte, 2)
 	tmp4 := make([]byte, 4)
@@ -156,5 +171,45 @@ func (a *DNSAnswer) ToBytes() []byte {
 	binary.BigEndian.PutUint16(tmp2, a.RDLength)
 	buf.Write(tmp2)
 	buf.Write(a.RDData)
-	return buf.Bytes()
+	return buf.Bytes(), nil
+}
+
+func (a *DNSAnswer) SType() (string, error) {
+	stype, suc := typename[a.Type]
+	if suc != true {
+		return "", errors.New("No such RR type")
+	}
+	return stype, nil
+}
+
+func (a *DNSAnswer) RedisKey() (string, error) {
+	sname, err := a.SName()
+	if err != nil {
+		return "", err
+	}
+	stype, err := a.SType()
+	if err != nil {
+		return "", err
+	}
+	return sname + ":" + stype, nil
+}
+
+var typename = map[uint16]string{
+	1:  "A",
+	2:  "NS",
+	3:  "MD",
+	4:  "MF",
+	5:  "CNAME",
+	6:  "SOA",
+	7:  "MB",
+	8:  "MG",
+	9:  "MR",
+	10: "NULL",
+	11: "WKS",
+	12: "PTR",
+	13: "HINFO",
+	14: "MINFO",
+	15: "MX",
+	16: "TXT",
+	28: "AAAA",
 }

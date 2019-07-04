@@ -81,20 +81,32 @@ func (m *DNSMessage) Print() {
 	}
 }
 
-func (m *DNSMessage) ToBytes() []byte {
+func (m *DNSMessage) ToBytes() ([]byte, error) {
 	var buf bytes.Buffer
 	buf.Write(m.Header.ToBytes())
 	for i := 0; i < int(m.Header.QDCount); i++ {
 		buf.Write(m.Question[i].ToBytes())
 	}
 	for i := 0; i < int(m.Header.ANCount); i++ {
-		buf.Write(m.Answer[i].ToBytes())
+		b, err := m.Answer[i].ToBytes()
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(b)
 	}
 	for i := 0; i < int(m.Header.NSCount); i++ {
-		buf.Write(m.Authority[i].ToBytes())
+		b, err := m.Authority[i].ToBytes()
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(b)
 	}
 	for i := 0; i < int(m.Header.ARCount); i++ {
-		buf.Write(m.Additional[i].ToBytes())
+		b, err := m.Additional[i].ToBytes()
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(b)
 	}
-	return buf.Bytes()
+	return buf.Bytes(), nil
 }
