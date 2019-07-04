@@ -1,6 +1,7 @@
 package dnssrv
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -10,8 +11,11 @@ import (
 )
 
 const (
-	MaxRoutineSize = 10
-	serverAddr     = "0.0.0.0:53"
+	UDPRange      = uint16(6500)
+	UDPBufferSize = 520
+	TCPRange      = uint16(50)
+	TCPBUfferSize = 50000
+	serverAddr    = "0.0.0.0:53"
 )
 
 type Server struct {
@@ -22,7 +26,10 @@ type Server struct {
 	remoteConn net.Conn
 	connected  bool
 
-	RoutineLimit chan bool
+	UDPRoutineLimit chan uint16
+	UDPBuffer       [UDPRange][]byte
+	TCPRoutineLimit chan uint16
+	TCPBuffer       [TCPRange][]byte
 }
 
 func (srv *Server) SetLogger(mLogger *log.Logger) {
@@ -55,15 +62,14 @@ func (srv *Server) tryDisonnectFromRemoteDNSServer() error {
 	return nil
 }
 
-func (srv *Server) AccquireRoutine() {
-	srv.RoutineLimit <- true
-}
-
-func (srv *Server) ReleaseRoutine() {
-	<-srv.RoutineLimit
-}
-
 func (srv *Server) ListenAndServe(host string) (err error) {
+
+	if uint32(UDPRange)+uint32(TCPRange) > uint32(65536) {
+		err = errors.New("limit size of link out of index")
+		srv.logger.Errorln(err)
+		return
+	}
+
 	if err = srv.tryConnectToRemoteDNSServer(host + ":53"); err != nil {
 		return
 	}
@@ -90,10 +96,23 @@ func (srv *Server) ListenAndServe(host string) (err error) {
 		return err
 	}
 
-	srv.RoutineLimit = make(chan bool, MaxRoutineSize)
+	srv.UDPRoutineLimit = make(chan uint16, UDPRange)
+	srv.TCPRoutineLimit = make(chan uint16, TCPRange)
+	for idx := uint16(0); idx < UDPRange; idx++ {
+		srv.UDPRoutineLimit <- idx
+		srv.UDPBuffer[idx] = make([]byte, UDPBufferSize)
+	}
+	for idx := UDPRange; idx < TCPRange; idx++ {
+		srv.TCPRoutineLimit <- idx
+		srv.TCPBuffer[idx-UDPRange] = make([]byte, TCPBUfferSize)
+	}
 	for {
-		srv.AccquireRoutine()
-		go srv.ServeFromOut()
+		select {
+		case idx := <-srv.UDPRoutineLimit:
+			go srv.ServeUDPFromOut(idx, srv.UDPBuffer[idx])
+		case idx := <-srv.TCPRoutineLimit:
+			go srv.ServeTCPFromOut(idx, srv.TCPBuffer[idx-UDPRange])
+		}
 	}
 }
 
@@ -151,9 +170,12 @@ func (srv *Server) LookUpA(host, req string) (ret string, err error) {
 	return "", nil
 }
 
-func (srv *Server) ServeFromOut() {
-	defer srv.ReleaseRoutine()
-	b := make([]byte, 1024)
+func (srv *Server) ReleaseUDPRoutine(tid uint16) {
+	srv.UDPRoutineLimit <- tid
+}
+
+func (srv *Server) ServeUDPFromOut(tid uint16, b []byte) {
+	defer srv.ReleaseUDPRoutine(tid)
 	_, servingAddr, err := srv.conn.ReadFromUDP(b)
 	if err != nil {
 		srv.logger.Errorf("failed read udp msg, error: " + err.Error())
@@ -166,7 +188,39 @@ func (srv *Server) ServeFromOut() {
 		return
 	}
 
-	b = make([]byte, 1024)
+	_, err = srv.remoteConn.Read(b)
+	if err != nil {
+		srv.logger.Errorf("read error: %v", err)
+		return
+	}
+
+	_, err = srv.conn.WriteToUDP(b, servingAddr)
+	if err != nil {
+		srv.logger.Errorf("write to client error: %v", err)
+		return
+	}
+
+	srv.logger.Infof("reply to address: %v", servingAddr)
+}
+
+func (srv *Server) ReleaseTCPRoutine(tid uint16) {
+	srv.TCPRoutineLimit <- tid
+}
+
+func (srv *Server) ServeTCPFromOut(tid uint16, b []byte) {
+	defer srv.ReleaseUDPRoutine(tid)
+	_, servingAddr, err := srv.conn.ReadFromUDP(b)
+	if err != nil {
+		srv.logger.Errorf("failed read udp msg, error: " + err.Error())
+		return
+	}
+	srv.logger.Infof("new message incoming: address: %v", servingAddr)
+
+	if _, err := srv.remoteConn.Write(b); err != nil {
+		srv.logger.Errorf("write error: %v", err)
+		return
+	}
+
 	_, err = srv.remoteConn.Read(b)
 	if err != nil {
 		srv.logger.Errorf("read error: %v", err)
