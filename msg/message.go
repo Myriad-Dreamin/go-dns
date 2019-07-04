@@ -1,7 +1,10 @@
 package msg
 
-import flags "github.com/Myriad-Dreamin/go-dns/msg/flags"
-import "bytes"
+import (
+	"bytes"
+
+	flags "github.com/Myriad-Dreamin/go-dns/msg/flags"
+)
 
 const (
 	// reserve 62 bytes for Name Segment
@@ -36,12 +39,12 @@ type Context struct {
 }
 
 // Assuming Empty Message
-func (m DNSMessage) InitQuery(msgid uint16) {
+func (m *DNSMessage) InitQuery(msgid uint16) {
 	m.Header.ID = msgid
 }
 
 // Assuming Empty Message
-func (m DNSMessage) InitRecursivelyQuery(msgid uint16) {
+func (m *DNSMessage) InitRecursivelyQuery(msgid uint16) {
 	m.Header.ID = msgid
 	m.Header.Flags = flags.RD
 }
@@ -136,11 +139,15 @@ func (m *DNSMessage) Print() {
 	}
 }
 
-func (m *DNSMessage) ToBytes() ([]byte, error) {
+func (m *DNSMessage) ToBytes() (b []byte, err error) {
 	var buf bytes.Buffer
 	buf.Write(m.Header.ToBytes())
 	for i := 0; i < int(m.Header.QDCount); i++ {
-		buf.Write(m.Question[i].ToBytes())
+		b, err = m.Question[i].ToBytes()
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(b)
 	}
 	for i := 0; i < int(m.Header.ANCount); i++ {
 		b, err := m.Answer[i].ToBytes()

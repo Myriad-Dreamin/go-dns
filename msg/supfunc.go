@@ -3,6 +3,9 @@ package msg
 import (
 	"bytes"
 	"errors"
+	"io"
+
+	mdnet "github.com/Myriad-Dreamin/go-dns/net"
 )
 
 func BytesToInt(bs []byte, val interface{}) int {
@@ -64,4 +67,31 @@ func GetFullName(bs []byte, offset int) ([]byte, int, error) {
 		}
 	}
 	return nil, 0, errors.New("Wrong Domain Name Format")
+}
+
+// todo: ignoring the case of '\.'
+func ToDNSDomainName(dnm []byte) ([]byte, error) {
+	var rw = mdnet.NewIO()
+	var bf = bytes.NewBuffer(dnm)
+	for {
+		d, err := bf.ReadBytes(byte('.'))
+		if err == io.EOF {
+			if d == nil {
+				return nil, errors.New("nil domain name is not allowed")
+			}
+			rw.Write(byte(len(d)))
+			rw.Write(d)
+			rw.Write(byte(0))
+			return rw.Bytes(), nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		if len(d) < 2 {
+			return nil, errors.New("nil domain name is not allowed")
+		}
+		d = d[:len(d)-1]
+		rw.Write(byte(len(d)))
+		rw.Write(d)
+	}
 }

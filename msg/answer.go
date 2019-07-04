@@ -165,7 +165,11 @@ func (a *DNSAnswer) ToBytes() ([]byte, error) {
 	var buf bytes.Buffer
 	tmp2 := make([]byte, 2)
 	tmp4 := make([]byte, 4)
-	buf.Write(a.Name)
+	b, err := ToDNSDomainName(a.Name)
+	if err != nil {
+		return nil, err
+	}
+	buf.Write(b)
 	binary.BigEndian.PutUint16(tmp2, a.Type)
 	buf.Write(tmp2)
 	binary.BigEndian.PutUint16(tmp2, a.Class)

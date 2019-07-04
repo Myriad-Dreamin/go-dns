@@ -13,7 +13,6 @@ type ServerCmd struct {
 
 	cmd *urcli.Command
 
-	port int
 	host string
 }
 
@@ -35,6 +34,7 @@ func (serve *ServerCmd) After(c *urcli.Context) (err error) {
 func (serve *ServerCmd) MakeCommands() urcli.Commands {
 	return []urcli.Command{
 		NewServerStartCmd(serve),
+		NewServerLookUpACmd(serve),
 	}
 }
 
@@ -51,15 +51,9 @@ func NewServerCmd(dnsSrv *ServerX) *ServerCmd {
 		Action:      nil,
 		Subcommands: serve.MakeCommands(),
 		Flags: []urcli.Flag{
-			urcli.IntFlag{
-				Name:        "port, p",
-				Value:       23335,
-				Usage:       "listening port",
-				Destination: &serve.port,
-			},
 			urcli.StringFlag{
 				Name:        "host",
-				Value:       "114.114.114.114",
+				Value:       "223.5.5.5",
 				Usage:       "parent dns address",
 				Destination: &serve.host,
 			},

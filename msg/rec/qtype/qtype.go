@@ -1,4 +1,4 @@
-package RType
+package QType
 
 type Type = uint16
 

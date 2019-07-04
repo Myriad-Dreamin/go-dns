@@ -116,13 +116,17 @@ func (q *DNSQuestion) SName() string {
 	return s
 }
 
-func (q *DNSQuestion) ToBytes() []byte {
+func (q *DNSQuestion) ToBytes() ([]byte, error) {
 	var buf bytes.Buffer
 	tmp := make([]byte, 2)
-	buf.Write(q.Name)
+	b, err := ToDNSDomainName(q.Name)
+	if err != nil {
+		return nil, err
+	}
+	buf.Write(b)
 	binary.BigEndian.PutUint16(tmp, q.Type)
 	buf.Write(tmp)
 	binary.BigEndian.PutUint16(tmp, q.Class)
 	buf.Write(tmp)
-	return buf.Bytes()
+	return buf.Bytes(), nil
 }

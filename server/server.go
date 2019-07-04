@@ -34,6 +34,7 @@ func (srv *Server) tryConnectToRemoteDNSServer(host string) (err error) {
 		srv.logger.Errorf("error occurred when dial remote dns server: %v\n", err)
 		return
 	}
+
 	return
 }
 
@@ -50,7 +51,7 @@ func (srv *Server) tryDisonnectFromRemoteDNSServer() error {
 	return nil
 }
 
-func (srv *Server) ListenAndServe(port, host string) (err error) {
+func (srv *Server) ListenAndServe(host string) (err error) {
 	if err = srv.tryConnectToRemoteDNSServer(host + ":53"); err != nil {
 		return
 	}
@@ -61,11 +62,22 @@ func (srv *Server) ListenAndServe(port, host string) (err error) {
 		err = srv.tryDisonnectFromRemoteDNSServer()
 	}()
 
-	requestNames := [][]byte{
-		[]byte("www.baidu.com"),
-		[]byte("www.163.com"),
+	return
+}
+
+func (srv *Server) LookUpA(host, req string) (ret string, err error) {
+	if err = srv.tryConnectToRemoteDNSServer(host + ":53"); err != nil {
+		return
 	}
-	requsetTypes := []uint16{1, 1}
+
+	srv.logger.Infof("udp socket set up successfully")
+	srv.connected = true
+	defer func() {
+		err = srv.tryDisonnectFromRemoteDNSServer()
+	}()
+
+	requestNames := [][]byte{[]byte(req)}
+	requsetTypes := []uint16{1}
 
 	request := msg.Quest(
 		requestNames,
@@ -74,12 +86,37 @@ func (srv *Server) ListenAndServe(port, host string) (err error) {
 
 	for len(request) != 0 {
 		n, s := msg.NewDNSMessageContextRecursivelyQuery(1, request)
-		fmt.Println(n, s)
-		fmt.Println(s.ToBytes())
 		request = request[n:]
-	}
 
-	return
+		fmt.Println(n, s)
+		b, err := s.ToBytes()
+		if err != nil {
+			srv.logger.Errorf("convert request message error: %v", err)
+			return "", err
+		}
+
+		if _, err := srv.conn.Write(b); err != nil {
+			srv.logger.Errorf("write error: %v", err)
+			return "", err
+		}
+
+		b = make([]byte, 1024)
+		n, err = srv.conn.Read(b)
+		if err != nil {
+			srv.logger.Errorf("read error: %v", err)
+			return "", err
+		}
+
+		var rmsg = new(msg.DNSMessage)
+		n, err = rmsg.Read(b)
+		if err != nil {
+			srv.logger.Errorf("convert read message error: %v", err)
+			return "", err
+		}
+		fmt.Println(n, err)
+		rmsg.Print()
+	}
+	return "", nil
 }
 
 func (srv *Server) CreateServeRoutine() {

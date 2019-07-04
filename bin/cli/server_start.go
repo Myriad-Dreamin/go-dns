@@ -43,11 +43,7 @@ func (cmd *ServerStartCmd) Action(c *urcli.Context) error {
 	var dnsServer = new(dnsrv.Server)
 	dnsServer.SetLogger(cmd.RequestRootLogger())
 
-	strPort, err := convertPortFromInt(cmd.parentCmd.port)
-	if err != nil {
-		return err
-	}
-	if err := dnsServer.ListenAndServe(strPort, cmd.parentCmd.host); err != nil {
+	if err := dnsServer.ListenAndServe(cmd.parentCmd.host); err != nil {
 		return err
 	}
 	return nil

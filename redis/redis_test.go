@@ -4,10 +4,11 @@ import (
 	"fmt"
 	// "github.com/go-redis/redis"
 	"encoding/hex"
-	"github.com/Myriad-Dreamin/go-dns/msg"
-	"github.com/garyburd/redigo/redis"
 	"testing"
 	"time"
+
+	"github.com/Myriad-Dreamin/go-dns/msg"
+	"github.com/garyburd/redigo/redis"
 )
 
 // rediskey:

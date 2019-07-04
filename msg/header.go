@@ -114,6 +114,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+
+	mdnet "github.com/Myriad-Dreamin/go-dns/net"
 )
 
 type DNSHeader struct {
@@ -189,19 +191,7 @@ func (h *DNSHeader) Print() {
 }
 
 func (h *DNSHeader) ToBytes() []byte {
-	var buf bytes.Buffer
-	tmp := make([]byte, 2)
-	binary.BigEndian.PutUint16(tmp, h.ID)
-	buf.Write(tmp)
-	binary.BigEndian.PutUint16(tmp, h.Flags)
-	buf.Write(tmp)
-	binary.BigEndian.PutUint16(tmp, h.QDCount)
-	buf.Write(tmp)
-	binary.BigEndian.PutUint16(tmp, h.ANCount)
-	buf.Write(tmp)
-	binary.BigEndian.PutUint16(tmp, h.NSCount)
-	buf.Write(tmp)
-	binary.BigEndian.PutUint16(tmp, h.ARCount)
-	buf.Write(tmp)
-	return buf.Bytes()
+	var rw = mdnet.NewIO()
+	rw.Write(h)
+	return rw.Bytes()
 }
