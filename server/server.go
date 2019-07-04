@@ -27,14 +27,14 @@ type Server struct {
 	connected  bool
 
 	UDPRoutineLimit chan uint16
-	UDPBuffer       [UDPRange][]byte
+	UDPBuffer       [UDPRange + 5][]byte
 
 	UDPReadRoutineLimit chan uint16
-	UDPReadBuffer       [UDPRange][]byte
-	UDPReadBytesChan    [UDPRange]chan uint16
+	UDPReadBuffer       [UDPRange + 5][]byte
+	UDPReadBytesChan    [UDPRange + 5]chan uint16
 
 	TCPRoutineLimit chan uint16
-	TCPBuffer       [TCPRange][]byte
+	TCPBuffer       [TCPRange + 5][]byte
 }
 
 func (srv *Server) SetLogger(mLogger *log.Logger) {
@@ -106,6 +106,7 @@ func (srv *Server) ListenAndServe(host string) (err error) {
 	srv.UDPReadRoutineLimit = make(chan uint16, UDPRange)
 	for idx := uint16(0); idx < UDPRange; idx++ {
 		srv.UDPRoutineLimit <- idx
+		srv.UDPReadRoutineLimit <- idx
 		srv.UDPBuffer[idx] = make([]byte, UDPBufferSize)
 		srv.UDPReadBuffer[idx] = make([]byte, UDPBufferSize)
 		srv.UDPReadBytesChan[idx] = make(chan uint16, 1)
@@ -190,6 +191,8 @@ func (srv *Server) ReleaseUDPReadRoutine(tid uint16) {
 
 func (srv *Server) ServeUDPReadFromOut(tid uint16, b []byte) {
 	_, err := srv.remoteConn.Read(b)
+	// srv.srvMutex.Lock()
+	// defer srv.srvMutex.Unlock()
 	if err != nil {
 		srv.logger.Errorf("read error: %v", err)
 		return
@@ -223,7 +226,6 @@ func (srv *Server) ServeUDPFromOut(tid uint16, b []byte) {
 		srv.logger.Errorf("write error: %v", err)
 		return
 	}
-	srv.UDPReadRoutineLimit <- tid
 	rid := <-srv.UDPReadBytesChan[tid]
 	defer srv.ReleaseUDPReadRoutine(rid)
 	b = srv.UDPReadBuffer[rid]
