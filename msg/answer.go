@@ -53,6 +53,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/rand"
+	"strconv"
+	"time"
 )
 
 type DNSAnswer struct {
@@ -72,7 +75,7 @@ func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
 	var cnt, l int
 	var b []byte
 	var err error
-	a.Name, l, err = GetFullName(bs, offset)
+	a.Name, l, err = GetStringFullName(bs, offset)
 	if err != nil {
 		return 0, err
 	}
@@ -107,29 +110,29 @@ func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
 }
 
 func (a *DNSAnswer) Print() {
-	// fmt.Printf(
-	// 	"AnswerInfo:\nName:%x\nType:%d\nClass:%d\nTLL:%d\nRDLength:%d\nRDData:%x\n\n",
-	// 	a.Name,
-	// 	a.Type,
-	// 	a.Class,
-	// 	a.TTL,
-	// 	a.RDLength,
-	// 	a.RDData,
-	// )
-	sname, err := a.SName()
-	if err != nil {
-		fmt.Println("Wrong DNSAnswer format")
-		return
-	}
 	fmt.Printf(
 		"AnswerInfo:\nName:%s\nType:%d\nClass:%d\nTLL:%d\nRDLength:%d\nRDData:%x\n\n",
-		sname,
+		a.Name,
 		a.Type,
 		a.Class,
 		a.TTL,
 		a.RDLength,
 		a.RDData,
 	)
+	// sname, err := a.SName()
+	// if err != nil {
+	// 	fmt.Println("Wrong DNSAnswer format")
+	// 	return
+	// }
+	// fmt.Printf(
+	// 	"AnswerInfo:\nName:%s\nType:%d\nClass:%d\nTLL:%d\nRDLength:%d\nRDData:%x\n\n",
+	// 	sname,
+	// 	a.Type,
+	// 	a.Class,
+	// 	a.TTL,
+	// 	a.RDLength,
+	// 	a.RDData,
+	// )
 }
 
 func (a *DNSAnswer) SName() (string, error) {
@@ -191,10 +194,11 @@ func (a *DNSAnswer) SType() (string, error) {
 }
 
 func (a *DNSAnswer) RedisKey() (string, error) {
-	sname, err := a.SName()
-	if err != nil {
-		return "", err
-	}
+	// sname, err := a.SName()
+	// if err != nil {
+	// 	return "", err
+	// }
+	sname := string(a.Name)
 	stype, err := a.SType()
 	if err != nil {
 		return "", err
@@ -202,22 +206,12 @@ func (a *DNSAnswer) RedisKey() (string, error) {
 	return sname + ":" + stype, nil
 }
 
-var typename = map[uint16]string{
-	1:  "A",
-	2:  "NS",
-	3:  "MD",
-	4:  "MF",
-	5:  "CNAME",
-	6:  "SOA",
-	7:  "MB",
-	8:  "MG",
-	9:  "MR",
-	10: "NULL",
-	11: "WKS",
-	12: "PTR",
-	13: "HINFO",
-	14: "MINFO",
-	15: "MX",
-	16: "TXT",
-	28: "AAAA",
+func (a *DNSAnswer) RedisRandomKey() (string, error) {
+	rand.Seed(time.Now().UnixNano())
+	hash := rand.Int31()
+	rkey, err := a.RedisKey()
+	if err != nil {
+		return "", err
+	}
+	return rkey + ":" + strconv.Itoa(int(hash)), nil
 }

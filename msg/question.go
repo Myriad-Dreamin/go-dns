@@ -3,8 +3,8 @@ package msg
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
-
 	QClass "github.com/Myriad-Dreamin/go-dns/msg/rec/qclass"
 )
 
@@ -61,7 +61,7 @@ func (q *DNSQuestion) ReadFrom(bs []byte, offset int) (int, error) {
 	var cnt, l int
 	var b []byte
 	var err error
-	if q.Name, l, err = GetFullName(bs, offset); err != nil {
+	if q.Name, l, err = GetStringFullName(bs, offset); err != nil {
 		return 0, err
 	}
 	cnt += l
@@ -80,18 +80,18 @@ func (q *DNSQuestion) ReadFrom(bs []byte, offset int) (int, error) {
 }
 
 func (q *DNSQuestion) Print() {
-	// fmt.Printf(
-	// 	"QuestionInfo:\nName:%x\nType:%d\nClass:%d\n\n",
-	// 	q.Name,
-	// 	q.Type,
-	// 	q.Class,
-	// )
 	fmt.Printf(
 		"QuestionInfo:\nName:%s\nType:%d\nClass:%d\n\n",
-		q.SName(),
+		q.Name,
 		q.Type,
 		q.Class,
 	)
+	// fmt.Printf(
+	// 	"QuestionInfo:\nName:%s\nType:%d\nClass:%d\n\n",
+	// 	q.SName(),
+	// 	q.Type,
+	// 	q.Class,
+	// )
 }
 
 func (q *DNSQuestion) SName() string {
@@ -116,6 +116,14 @@ func (q *DNSQuestion) SName() string {
 	return s
 }
 
+func (q *DNSQuestion) SType() (string, error) {
+	stype, suc := typename[q.Type]
+	if suc != true {
+		return "", errors.New("No such RR type")
+	}
+	return stype, nil
+}
+
 func (q *DNSQuestion) ToBytes() ([]byte, error) {
 	var buf bytes.Buffer
 	tmp := make([]byte, 2)
@@ -129,4 +137,13 @@ func (q *DNSQuestion) ToBytes() ([]byte, error) {
 	binary.BigEndian.PutUint16(tmp, q.Class)
 	buf.Write(tmp)
 	return buf.Bytes(), nil
+}
+
+func (q *DNSQuestion) RedisKey() (string, error) {
+	sname := string(q.Name)
+	stype, err := q.SType()
+	if err != nil {
+		return "", err
+	}
+	return sname + ":" + stype, nil
 }

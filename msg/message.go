@@ -2,7 +2,6 @@ package msg
 
 import (
 	"bytes"
-
 	flags "github.com/Myriad-Dreamin/go-dns/msg/flags"
 )
 
