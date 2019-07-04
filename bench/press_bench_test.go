@@ -73,7 +73,7 @@ func (srv *Client) MTestLookUpA(tid uint16, req string) (ret string, err error) 
 		}
 
 		b = make([]byte, 1024)
-		srv.remoteConn.SetDeadline(time.Now().Add(time.Millisecond * 800))
+		srv.remoteConn.SetDeadline(time.Now().Add(time.Millisecond * 1000))
 		n, err = srv.remoteConn.Read(b)
 		if err != nil {
 			fmt.Printf("read error: %v", err)
@@ -111,6 +111,7 @@ func BenchmarkTestA(b *testing.B) {
 	}()
 	b.ResetTimer()
 	ff := uint16(1)
+	b.N = 1000
 	for i := 0; i < b.N; i++ {
 		c.WG.Add(1)
 		go func() {
@@ -120,5 +121,4 @@ func BenchmarkTestA(b *testing.B) {
 		}()
 	}
 	c.WG.Wait()
-
 }
