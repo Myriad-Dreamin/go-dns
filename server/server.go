@@ -11,10 +11,10 @@ import (
 )
 
 const (
-	UDPRange      = uint16(6500)
+	UDPRange      = uint16(200)
 	UDPBufferSize = 520
 	TCPRange      = uint16(50)
-	TCPBUfferSize = 50000
+	TCPBUfferSize = 65000
 	serverAddr    = "0.0.0.0:53"
 )
 
@@ -28,6 +28,11 @@ type Server struct {
 
 	UDPRoutineLimit chan uint16
 	UDPBuffer       [UDPRange][]byte
+
+	UDPReadRoutineLimit chan uint16
+	UDPReadBuffer       [UDPRange][]byte
+	UDPReadBytesChan    [UDPRange]chan uint16
+
 	TCPRoutineLimit chan uint16
 	TCPBuffer       [TCPRange][]byte
 }
@@ -98,9 +103,12 @@ func (srv *Server) ListenAndServe(host string) (err error) {
 
 	srv.UDPRoutineLimit = make(chan uint16, UDPRange)
 	srv.TCPRoutineLimit = make(chan uint16, TCPRange)
+	srv.UDPReadRoutineLimit = make(chan uint16, UDPRange)
 	for idx := uint16(0); idx < UDPRange; idx++ {
 		srv.UDPRoutineLimit <- idx
 		srv.UDPBuffer[idx] = make([]byte, UDPBufferSize)
+		srv.UDPReadBuffer[idx] = make([]byte, UDPBufferSize)
+		srv.UDPReadBytesChan[idx] = make(chan uint16, 1)
 	}
 	for idx := UDPRange; idx < TCPRange; idx++ {
 		srv.TCPRoutineLimit <- idx
@@ -112,6 +120,8 @@ func (srv *Server) ListenAndServe(host string) (err error) {
 			go srv.ServeUDPFromOut(idx, srv.UDPBuffer[idx])
 		case idx := <-srv.TCPRoutineLimit:
 			go srv.ServeTCPFromOut(idx, srv.TCPBuffer[idx-UDPRange])
+		case idx := <-srv.UDPReadRoutineLimit:
+			go srv.ServeUDPReadFromOut(idx, srv.UDPReadBuffer[idx])
 		}
 	}
 }
@@ -174,33 +184,66 @@ func (srv *Server) ReleaseUDPRoutine(tid uint16) {
 	srv.UDPRoutineLimit <- tid
 }
 
-func (srv *Server) ServeUDPFromOut(tid uint16, b []byte) {
-	defer srv.ReleaseUDPRoutine(tid)
-	_, servingAddr, err := srv.conn.ReadFromUDP(b)
-	if err != nil {
-		srv.logger.Errorf("failed read udp msg, error: " + err.Error())
-		return
-	}
-	srv.logger.Infof("new message incoming: address: %v", servingAddr)
+func (srv *Server) ReleaseUDPReadRoutine(tid uint16) {
+	srv.UDPReadRoutineLimit <- tid
+}
 
-	if _, err := srv.remoteConn.Write(b); err != nil {
-		srv.logger.Errorf("write error: %v", err)
-		return
-	}
-
-	_, err = srv.remoteConn.Read(b)
+func (srv *Server) ServeUDPReadFromOut(tid uint16, b []byte) {
+	_, err := srv.remoteConn.Read(b)
 	if err != nil {
 		srv.logger.Errorf("read error: %v", err)
 		return
 	}
+	fmt.Println("receiving", (uint16(b[0])<<8)+uint16(b[1]))
+	srv.UDPReadBytesChan[(uint16(b[0])<<8)+uint16(b[1])] <- tid
+}
 
+func (srv *Server) ServeUDPFromOut(tid uint16, b []byte) {
+	defer srv.ReleaseUDPRoutine(tid)
+	_, servingAddr, err := srv.conn.ReadFromUDP(b)
+
+	var message msg.DNSMessage
+	_, err = message.Read(b)
+
+	if err != nil {
+		srv.logger.Errorf("failed read udp msg, error: " + err.Error())
+		return
+	}
+	srv.logger.Infof("new message incoming: id, address: %v, %v", message.Header.ID, servingAddr)
+	fid := message.Header.ID
+	message.Header.ID = tid
+	// b, err = message.ToBytes()
+	b[0] = byte(tid >> 8)
+	b[1] = byte(tid & 0xff)
+	if err != nil {
+		srv.logger.Errorf("convert error: %v", err)
+		return
+	}
+	if _, err := srv.remoteConn.Write(b); err != nil {
+		srv.logger.Errorf("write error: %v", err)
+		return
+	}
+	srv.UDPReadRoutineLimit <- tid
+	rid := <-srv.UDPReadBytesChan[tid]
+	defer srv.ReleaseUDPReadRoutine(rid)
+	b = srv.UDPReadBuffer[rid]
+
+	_, err = message.Read(b)
+	message.Header.ID = fid
+	// b, err = message.ToBytes()
+	b[0] = byte(fid >> 8)
+	b[1] = byte(fid & 0xff)
+	if err != nil {
+		srv.logger.Errorf("convert error: %v", err)
+		return
+	}
 	_, err = srv.conn.WriteToUDP(b, servingAddr)
 	if err != nil {
 		srv.logger.Errorf("write to client error: %v", err)
 		return
 	}
 
-	srv.logger.Infof("reply to address: %v", servingAddr)
+	srv.logger.Infof("reply to address: %v, %v", message.Header.ID, servingAddr)
 }
 
 func (srv *Server) ReleaseTCPRoutine(tid uint16) {
