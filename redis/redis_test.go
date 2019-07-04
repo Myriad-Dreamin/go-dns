@@ -69,42 +69,41 @@ func TestRedis(t *testing.T) {
 		return
 	}
 
-	key, err := msgMessage.Answer[0].RedisRandomKey()
-	val, err := msgMessage.Answer[0].ToBytes()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	c, err := redis.Dial("tcp", "127.0.0.1:6379")
+	conn := pool.Get()
+	fmt.Println()
+	//conn, err := redis.Dial("tcp", "127.0.0.1:6379")
 	if err != nil {
 		fmt.Println("Connect to redis error", err)
 		return
 	}
-	defer c.Close()
-	_, err = c.Do("set", key, val, "EX", msgMessage.Answer[0].TTL) // 5s
-	// _, err = c.Do("set", key, val) // 5s
+	defer conn.Close()
+	// _, err = conn.Do("set", key, val, "EX", msgMessage.Answer[0].TTL) // 5s
+	// _, err = conn.Do("set", key, val) // 5s
 	if err != nil {
 		fmt.Println("redis set failed:", err)
 	}
 
-	if err = PushToRedis(msgMessage.Answer, c); err != nil {
+	if err = PushToRedis(msgMessage.Answer, conn); err != nil {
 		fmt.Println(err)
 		return
 	}
-	if err = PushToRedis(msgMessage.Authority, c); err != nil {
+	if err = PushToRedis(msgMessage.Authority, conn); err != nil {
 		fmt.Println(err)
 		return
 	}
-	if err = PushToRedis(msgMessage.Additional, c); err != nil {
+	if err = PushToRedis(msgMessage.Additional, conn); err != nil {
 		fmt.Println(err)
 		return
 	}
 
 	searchkey, err := msgMessage.Question[0].RedisKey()
 
-	fmt.Println(searchkey)
+	// fmt.Println(searchkey)
 
-	keys, err := redis.Strings(c.Do("keys", searchkey+":*"))
+	// keys, err := redis.Strings(conn.Do("keys", searchkey+":*"))
+	conn.Send("keys", searchkey+":*")
+	conn.Flush()
+	keys, err := redis.Strings(conn.Receive())
 
 	if err != nil {
 		fmt.Println(err)
@@ -113,7 +112,7 @@ func TestRedis(t *testing.T) {
 
 	for _, k := range keys {
 
-		keyval, err := redis.Bytes(c.Do("GET", k))
+		keyval, err := redis.Bytes(conn.Do("GET", k))
 
 		var redismsg msg.DNSAnswer
 		redismsg.ReadFrom(keyval, 0)

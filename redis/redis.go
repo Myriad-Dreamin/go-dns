@@ -16,7 +16,14 @@ func PushToRedis(answers []msg.DNSAnswer, client redis.Conn) error {
 		if err != nil {
 			return err
 		}
-		client.Do("set", key, b, "EX", ans.TTL)
+		// client.Do("set", key, b, "EX", ans.TTL)
+		client.Send("set", key, b, "EX", ans.TTL)
+	}
+	client.Flush()
+	for i := 0; i < len(answers); i++ {
+		if _, err := client.Receive(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
