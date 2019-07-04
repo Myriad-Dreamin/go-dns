@@ -159,6 +159,7 @@ func (srv *Server) ServeFromOut() {
 		srv.logger.Errorf("failed read udp msg, error: " + err.Error())
 		return
 	}
+	srv.logger.Infof("new message incoming: address: %v", servingAddr)
 
 	if _, err := srv.remoteConn.Write(b); err != nil {
 		srv.logger.Errorf("write error: %v", err)
@@ -177,4 +178,6 @@ func (srv *Server) ServeFromOut() {
 		srv.logger.Errorf("write to client error: %v", err)
 		return
 	}
+
+	srv.logger.Infof("reply to address: %v", servingAddr)
 }
