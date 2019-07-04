@@ -9,16 +9,20 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const MaxRoutineSize = 10
+const (
+	MaxRoutineSize = 10
+	serverAddr     = "0.0.0.0:53"
+)
 
 type Server struct {
 	srvMutex sync.Mutex
 	logger   *log.Entry
 
-	conn      net.Conn
-	connected bool
+	conn       *net.UDPConn
+	remoteConn net.Conn
+	connected  bool
 
-	quitChain chan int
+	RoutineLimit chan bool
 }
 
 func (srv *Server) SetLogger(mLogger *log.Logger) {
@@ -28,7 +32,7 @@ func (srv *Server) SetLogger(mLogger *log.Logger) {
 }
 
 func (srv *Server) tryConnectToRemoteDNSServer(host string) (err error) {
-	srv.conn, err = net.Dial("udp", host)
+	srv.remoteConn, err = net.Dial("udp", host)
 
 	if err != nil {
 		srv.logger.Errorf("error occurred when dial remote dns server: %v\n", err)
@@ -45,10 +49,18 @@ func (srv *Server) tryDisonnectFromRemoteDNSServer() error {
 		if srv.connected {
 			srv.connected = false
 			srv.logger.Infof("disconnected from remote DNS server")
-			return srv.conn.Close()
+			return srv.remoteConn.Close()
 		}
 	}
 	return nil
+}
+
+func (srv *Server) AccquireRoutine() {
+	srv.RoutineLimit <- true
+}
+
+func (srv *Server) ReleaseRoutine() {
+	<-srv.RoutineLimit
 }
 
 func (srv *Server) ListenAndServe(host string) (err error) {
@@ -62,7 +74,27 @@ func (srv *Server) ListenAndServe(host string) (err error) {
 		err = srv.tryDisonnectFromRemoteDNSServer()
 	}()
 
-	return
+	var udpAddr *net.UDPAddr
+	udpAddr, err = net.ResolveUDPAddr("udp", serverAddr)
+	if err != nil {
+		return
+	}
+	srv.conn, err = net.ListenUDP("udp", udpAddr)
+	if err != nil {
+		return
+	}
+	defer srv.conn.Close()
+
+	if err != nil {
+		srv.logger.Errorf("setup local server error: %v", err)
+		return err
+	}
+
+	srv.RoutineLimit = make(chan bool, MaxRoutineSize)
+	for {
+		srv.AccquireRoutine()
+		go srv.ServeFromOut()
+	}
 }
 
 func (srv *Server) LookUpA(host, req string) (ret string, err error) {
@@ -95,13 +127,13 @@ func (srv *Server) LookUpA(host, req string) (ret string, err error) {
 			return "", err
 		}
 
-		if _, err := srv.conn.Write(b); err != nil {
+		if _, err := srv.remoteConn.Write(b); err != nil {
 			srv.logger.Errorf("write error: %v", err)
 			return "", err
 		}
 
 		b = make([]byte, 1024)
-		n, err = srv.conn.Read(b)
+		n, err = srv.remoteConn.Read(b)
 		if err != nil {
 			srv.logger.Errorf("read error: %v", err)
 			return "", err
@@ -119,16 +151,30 @@ func (srv *Server) LookUpA(host, req string) (ret string, err error) {
 	return "", nil
 }
 
-func (srv *Server) CreateServeRoutine() {
-	// go func() {
-	// 	for {
-	// 		select {
-	// 		case job := <-queue:
-	// 			job.Do(request)
-	// 		case <-quit:
-	// 			return
-	// 		}
-	//
-	// 	}
-	// }()
+func (srv *Server) ServeFromOut() {
+	defer srv.ReleaseRoutine()
+	b := make([]byte, 1024)
+	_, servingAddr, err := srv.conn.ReadFromUDP(b)
+	if err != nil {
+		srv.logger.Errorf("failed read udp msg, error: " + err.Error())
+		return
+	}
+
+	if _, err := srv.remoteConn.Write(b); err != nil {
+		srv.logger.Errorf("write error: %v", err)
+		return
+	}
+
+	b = make([]byte, 1024)
+	_, err = srv.remoteConn.Read(b)
+	if err != nil {
+		srv.logger.Errorf("read error: %v", err)
+		return
+	}
+
+	_, err = srv.conn.WriteToUDP(b, servingAddr)
+	if err != nil {
+		srv.logger.Errorf("write to client error: %v", err)
+		return
+	}
 }
