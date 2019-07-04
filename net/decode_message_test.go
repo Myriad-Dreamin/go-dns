@@ -44,7 +44,7 @@ import "github.com/Myriad-Dreamin/go-dns/msg"
 // Domain name: www.baidu.com
 // Domain name: www.a.shifen.com
 
-func TestDecodeHeader(t *testing.T) {
+func TestDecodeMessage(t *testing.T) {
 	var hexData = "59ad818000010003000000000377777705626169647503636f6d0000010001c00c0005000100000005000f0377777701610673686966656ec016c02b000100010000000500040ed7b127c02b000100010000000500040ed7b126"
 	var bytesData, err = hex.DecodeString(hexData)
 	if err != nil {

@@ -48,8 +48,12 @@ RDATA           a variable length string of octets that describes the
                 For example, the if the TYPE is A and the CLASS is IN,
                 the RDATA field is a 4 octet ARPA Internet address.
 */
-import "bytes"
-import "fmt"
+import (
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"fmt"
+)
 
 type DNSAnswer struct {
 	Name     []byte
@@ -60,28 +64,66 @@ type DNSAnswer struct {
 	RDData   []byte
 }
 
+func (a DNSAnswer) Size() uint16 {
+	return uint16(len(a.Name) + len(a.RDData) + 10)
+}
+
 func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
 	var cnt, l int
-	a.Name, l = GetFullName(bs, offset)
+	var b []byte
+	var err error
+	a.Name, l, err = GetFullName(bs, offset)
+	if err != nil {
+		return 0, err
+	}
 	cnt += l
 	buffer := bytes.NewBuffer(bs[offset+cnt:])
-	a.Type = uint16(BytesToInt(ReadnBytes(buffer, 2)))
+	if b, err = ReadnBytes(buffer, 2); err != nil {
+		return 0, err
+	}
+	a.Type = binary.BigEndian.Uint16(b)
 	cnt += 2
-	a.Class = uint16(BytesToInt(ReadnBytes(buffer, 2)))
+	if b, err = ReadnBytes(buffer, 2); err != nil {
+		return 0, err
+	}
+	a.Class = binary.BigEndian.Uint16(b)
 	cnt += 2
-	a.TTL = uint32(BytesToInt(ReadnBytes(buffer, 4)))
+	if b, err = ReadnBytes(buffer, 4); err != nil {
+		return 0, err
+	}
+	a.TTL = binary.BigEndian.Uint32(b)
 	cnt += 4
-	a.RDLength = uint16(BytesToInt(ReadnBytes(buffer, 2)))
+	if b, err = ReadnBytes(buffer, 2); err != nil {
+		return 0, err
+	}
+	a.RDLength = binary.BigEndian.Uint16(b)
 	cnt += 2
-	a.RDData, _ = ReadnBytes(buffer, int(a.RDLength))
+	a.RDData, err = ReadnBytes(buffer, int(a.RDLength))
+	if err != nil {
+		return 0, err
+	}
 	cnt += int(a.RDLength)
 	return cnt, nil
 }
 
 func (a *DNSAnswer) Print() {
+	// fmt.Printf(
+	// 	"AnswerInfo:\nName:%x\nType:%d\nClass:%d\nTLL:%d\nRDLength:%d\nRDData:%x\n\n",
+	// 	a.Name,
+	// 	a.Type,
+	// 	a.Class,
+	// 	a.TTL,
+	// 	a.RDLength,
+	// 	a.RDData,
+	// )
+	sname, err := a.SName()
+	if err != nil {
+		fmt.Println("Wrong DNSAnswer format")
+		return
+	}
 	fmt.Printf(
-		"AnswerInfo:\nName:%x\nType:%d\nClass:%d\nTLL:%d\nRDLength:%d\nRDData:%x\n\n",
-		a.Name,
+		"AnswerInfo:\nName:%s\nType:%d\nClass:%d\nTLL:%d\nRDLength:%d\nRDData:%x\n\n",
+		sname,
 		a.Type,
 		a.Class,
 		a.TTL,
@@ -90,10 +132,14 @@ func (a *DNSAnswer) Print() {
 	)
 }
 
-func (a *DNSAnswer) SName() string {
+func (a *DNSAnswer) SName() (string, error) {
 	var s string
-	var n, flag int
+	var n, l, flag int
+	l = len(a.Name)
 	for i := 0; ; i++ {
+		if i >= l {
+			return "", errors.New("Index out of range")
+		}
 		n = int(a.Name[i])
 		if n == 0 {
 			break
@@ -103,13 +149,71 @@ func (a *DNSAnswer) SName() string {
 			} else {
 				s += string('.')
 			}
+			if i+n+1 >= l {
+				return "", errors.New("Index out of range")
+			}
 			for j := 0; j < n; j++ {
 				s += string(a.Name[i+1+j])
 			}
 			i = i + n
 		}
 	}
-	fmt.Printf(
-		"Domain name: %s\n", s)
-	return s
+	return s, nil
+}
+
+func (a *DNSAnswer) ToBytes() ([]byte, error) {
+	var buf bytes.Buffer
+	tmp2 := make([]byte, 2)
+	tmp4 := make([]byte, 4)
+	buf.Write(a.Name)
+	binary.BigEndian.PutUint16(tmp2, a.Type)
+	buf.Write(tmp2)
+	binary.BigEndian.PutUint16(tmp2, a.Class)
+	buf.Write(tmp2)
+	binary.BigEndian.PutUint32(tmp4, a.TTL)
+	buf.Write(tmp4)
+	binary.BigEndian.PutUint16(tmp2, a.RDLength)
+	buf.Write(tmp2)
+	buf.Write(a.RDData)
+	return buf.Bytes(), nil
+}
+
+func (a *DNSAnswer) SType() (string, error) {
+	stype, suc := typename[a.Type]
+	if suc != true {
+		return "", errors.New("No such RR type")
+	}
+	return stype, nil
+}
+
+func (a *DNSAnswer) RedisKey() (string, error) {
+	sname, err := a.SName()
+	if err != nil {
+		return "", err
+	}
+	stype, err := a.SType()
+	if err != nil {
+		return "", err
+	}
+	return sname + ":" + stype, nil
+}
+
+var typename = map[uint16]string{
+	1:  "A",
+	2:  "NS",
+	3:  "MD",
+	4:  "MF",
+	5:  "CNAME",
+	6:  "SOA",
+	7:  "MB",
+	8:  "MG",
+	9:  "MR",
+	10: "NULL",
+	11: "WKS",
+	12: "PTR",
+	13: "HINFO",
+	14: "MINFO",
+	15: "MX",
+	16: "TXT",
+	28: "AAAA",
 }

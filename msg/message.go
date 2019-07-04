@@ -1,5 +1,13 @@
 package msg
 
+import flags "github.com/Myriad-Dreamin/go-dns/msg/flags"
+import "bytes"
+
+const (
+	// reserve 62 bytes for Name Segment
+	maxMessageSize = 450
+)
+
 /*
    +---------------------+
    |        Header       |
@@ -13,6 +21,7 @@ package msg
    |      Additional     |
    +---------------------+
 */
+
 type DNSMessage struct {
 	Header     DNSHeader
 	Question   []DNSQuestion
@@ -21,28 +30,91 @@ type DNSMessage struct {
 	Additional []DNSAnswer
 }
 
+type Context struct {
+	Message      DNSMessage
+	additionSize uint16
+}
+
+// Assuming Empty Message
+func (m DNSMessage) InitQuery(msgid uint16) {
+	m.Header.ID = msgid
+}
+
+// Assuming Empty Message
+func (m DNSMessage) InitRecursivelyQuery(msgid uint16) {
+	m.Header.ID = msgid
+	m.Header.Flags = flags.RD
+}
+
+func NewDNSMessageQuery(msgid uint16) (m *DNSMessage) {
+	m = new(DNSMessage)
+	m.InitQuery(msgid)
+	return
+}
+
+func NewDNSMessageRecursivelyQuery(msgid uint16) (m *DNSMessage) {
+	m = new(DNSMessage)
+	m.InitRecursivelyQuery(msgid)
+	return
+}
+
+func (m *DNSMessage) InsertQuestion(que ...DNSQuestion) {
+	m.Question = append(m.Question, que...)
+	m.Header.QDCount += uint16(len(que))
+}
+
+func (m *DNSMessage) InsertAnswer(ans ...DNSAnswer) {
+	m.Answer = append(m.Answer, ans...)
+	m.Header.ANCount += uint16(len(ans))
+}
+
+func (m *DNSMessage) InsertAuthority(ans ...DNSAnswer) {
+	m.Authority = append(m.Authority, ans...)
+	m.Header.NSCount += uint16(len(ans))
+}
+
+func (m *DNSMessage) InsertAdditional(ans ...DNSAnswer) {
+	m.Additional = append(m.Additional, ans...)
+	m.Header.ARCount += uint16(len(ans))
+}
+
 func (m *DNSMessage) Read(bs []byte) (int, error) {
 	var offset int
-	cnt, _ := m.Header.Read(bs[offset:])
+	cnt, err := m.Header.Read(bs[offset:])
+	if err != nil {
+		return offset, err
+	}
 	offset += cnt
 	m.Question = make([]DNSQuestion, m.Header.QDCount)
 	for i := 0; i < int(m.Header.QDCount); i++ {
-		cnt, _ := m.Question[i].ReadFrom(bs, offset)
+		cnt, err := m.Question[i].ReadFrom(bs, offset)
+		if err != nil {
+			return offset, err
+		}
 		offset += cnt
 	}
 	m.Answer = make([]DNSAnswer, m.Header.ANCount)
 	for i := 0; i < int(m.Header.ANCount); i++ {
-		cnt, _ := m.Answer[i].ReadFrom(bs, offset)
+		cnt, err := m.Answer[i].ReadFrom(bs, offset)
+		if err != nil {
+			return offset, err
+		}
 		offset += cnt
 	}
 	m.Authority = make([]DNSAnswer, m.Header.NSCount)
 	for i := 0; i < int(m.Header.NSCount); i++ {
-		cnt, _ := m.Authority[i].ReadFrom(bs, offset)
+		cnt, err := m.Authority[i].ReadFrom(bs, offset)
+		if err != nil {
+			return offset, err
+		}
 		offset += cnt
 	}
 	m.Additional = make([]DNSAnswer, m.Header.ARCount)
 	for i := 0; i < int(m.Header.ARCount); i++ {
-		cnt, _ := m.Additional[i].ReadFrom(bs, offset)
+		cnt, err := m.Additional[i].ReadFrom(bs, offset)
+		if err != nil {
+			return offset, err
+		}
 		offset += cnt
 	}
 	return offset, nil
@@ -62,4 +134,101 @@ func (m *DNSMessage) Print() {
 	for _, it := range m.Additional {
 		it.Print()
 	}
+}
+
+func (m *DNSMessage) ToBytes() ([]byte, error) {
+	var buf bytes.Buffer
+	buf.Write(m.Header.ToBytes())
+	for i := 0; i < int(m.Header.QDCount); i++ {
+		buf.Write(m.Question[i].ToBytes())
+	}
+	for i := 0; i < int(m.Header.ANCount); i++ {
+		b, err := m.Answer[i].ToBytes()
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(b)
+	}
+	for i := 0; i < int(m.Header.NSCount); i++ {
+		b, err := m.Authority[i].ToBytes()
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(b)
+	}
+	for i := 0; i < int(m.Header.ARCount); i++ {
+		b, err := m.Additional[i].ToBytes()
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(b)
+	}
+	return buf.Bytes(), nil
+}
+
+func NewDNSMessageContextQuery(msgid uint16, que []DNSQuestion) (n int, m *DNSMessage) {
+	c := new(Context)
+	c.Message.InitQuery(msgid)
+	c.additionSize = c.Message.Header.Size()
+	n = c.PacketQuestion(que)
+	m = &c.Message
+	return
+}
+
+func NewDNSMessageContextRecursivelyQuery(msgid uint16, que []DNSQuestion) (n int, m *DNSMessage) {
+	c := new(Context)
+	c.Message.InitRecursivelyQuery(msgid)
+	c.additionSize = c.Message.Header.Size()
+	n = c.PacketQuestion(que)
+	m = &c.Message
+	return
+}
+
+func (m *Context) PacketQuestion(question []DNSQuestion) int {
+	for i, q := range question {
+		if !m.InsertQuestion(q) {
+			return i
+		}
+	}
+	return len(question)
+}
+
+func (m *Context) InsertQuestion(que DNSQuestion) bool {
+	var qs = que.Size()
+	if m.additionSize+qs > maxMessageSize {
+		return false
+	}
+	m.Message.InsertQuestion(que)
+	m.additionSize += qs
+	return true
+}
+
+func (m *Context) InsertAnswer(ans DNSAnswer) bool {
+	var qs = ans.Size()
+	if m.additionSize+qs > maxMessageSize {
+		return false
+	}
+	m.Message.InsertAnswer(ans)
+	m.additionSize += qs
+	return true
+}
+
+func (m *Context) InsertAuthority(ans DNSAnswer) bool {
+	var qs = ans.Size()
+	if m.additionSize+qs > maxMessageSize {
+		return false
+	}
+	m.Message.InsertAuthority(ans)
+	m.additionSize += qs
+	return true
+}
+
+func (m *Context) InsertAdditional(ans DNSAnswer) bool {
+	var qs = ans.Size()
+	if m.additionSize+qs > maxMessageSize {
+		return false
+	}
+	m.Message.InsertAdditional(ans)
+	m.additionSize += qs
+	return true
 }

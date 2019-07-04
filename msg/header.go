@@ -110,8 +110,11 @@ NSCOUNT         an unsigned 16 bit integer specifying the number of name
 ARCOUNT         an unsigned 16 bit integer specifying the number of
                 resource records in the additional records section.
 */
-import "bytes"
-import "fmt"
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+)
 
 type DNSHeader struct {
 	ID      uint16
@@ -121,6 +124,8 @@ type DNSHeader struct {
 	NSCount uint16
 	ARCount uint16
 }
+
+func (h *DNSHeader) Size() uint16 { return 12 }
 
 // func (h *DNSHeader) Read(r io.ReadWriter) error {
 // 	var bs []byte
@@ -136,19 +141,44 @@ type DNSHeader struct {
 // }
 
 func (h *DNSHeader) Read(bs []byte) (int, error) {
+	var b []byte
+	var err error
 	buf := bytes.NewBuffer(bs)
-	h.ID = uint16(BytesToInt(ReadnBytes(buf, 2)))
-	h.Flags = uint16(BytesToInt(ReadnBytes(buf, 2)))
-	h.QDCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
-	h.ANCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
-	h.NSCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
-	h.ARCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
+	if b, err = ReadnBytes(buf, 2); err != nil {
+		return 0, err
+	}
+	h.ID = binary.BigEndian.Uint16(b)
+	if b, err = ReadnBytes(buf, 2); err != nil {
+		return 0, err
+	}
+	h.Flags = binary.BigEndian.Uint16(b)
+	if b, err = ReadnBytes(buf, 2); err != nil {
+		return 0, err
+	}
+	h.QDCount = binary.BigEndian.Uint16(b)
+	if b, err = ReadnBytes(buf, 2); err != nil {
+		return 0, err
+	}
+	h.ANCount = binary.BigEndian.Uint16(b)
+	if b, err = ReadnBytes(buf, 2); err != nil {
+		return 0, err
+	}
+	h.NSCount = binary.BigEndian.Uint16(b)
+	if b, err = ReadnBytes(buf, 2); err != nil {
+		return 0, err
+	}
+	h.ARCount = binary.BigEndian.Uint16(b)
+	// h.ID = uint16(BytesToInt())
+	// h.Flags = uint16(BytesToInt(ReadnBytes(buf, 2)))
+	// h.QDCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
+	// h.ANCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
+	// h.NSCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
+	// h.ARCount = uint16(BytesToInt(ReadnBytes(buf, 2)))
 	return 12, nil
 }
 
 func (h *DNSHeader) Print() {
-	fmt.Printf(
-		"HeaderInfo:\nID:%x\nFlags:%x\nquc:%x\nanc:%x\nauc:%x\nadc:%x\n\n",
+	fmt.Printf("HeaderInfo:\nID:%x\nFlags:%x\nQDcount:%d\nANCount:%d\nNSCount:%d\nARCount:%d\n\n",
 		h.ID,
 		h.Flags,
 		h.QDCount,
@@ -156,4 +186,22 @@ func (h *DNSHeader) Print() {
 		h.NSCount,
 		h.ARCount,
 	)
+}
+
+func (h *DNSHeader) ToBytes() []byte {
+	var buf bytes.Buffer
+	tmp := make([]byte, 2)
+	binary.BigEndian.PutUint16(tmp, h.ID)
+	buf.Write(tmp)
+	binary.BigEndian.PutUint16(tmp, h.Flags)
+	buf.Write(tmp)
+	binary.BigEndian.PutUint16(tmp, h.QDCount)
+	buf.Write(tmp)
+	binary.BigEndian.PutUint16(tmp, h.ANCount)
+	buf.Write(tmp)
+	binary.BigEndian.PutUint16(tmp, h.NSCount)
+	buf.Write(tmp)
+	binary.BigEndian.PutUint16(tmp, h.ARCount)
+	buf.Write(tmp)
+	return buf.Bytes()
 }
