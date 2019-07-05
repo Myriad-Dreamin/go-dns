@@ -1,6 +1,7 @@
 package dnssrv
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net"
@@ -251,10 +252,14 @@ func (srv *Server) ServeUDPFromOut(tid uint16, b []byte) {
 	defer srv.ReleaseUDPReadRoutine(rid)
 	b = srv.UDPReadBuffer[rid]
 
-	message = msg.DNSMessage{}
 	_, err = message.Read(b)
+	fmt.Println("converting", fid, "->", tid, message.Header.ID, "->", fid)
+	if tid != message.Header.ID {
+		srv.logger.Errorf("not matching..., serving %v", servingAddr)
+	}
 	message.Header.ID = fid
 	b, err = message.ToBytes()
+	fmt.Println(hex.EncodeToString(b))
 
 	// b[0] = byte(fid >> 8)
 	// b[1] = byte(fid & 0xff)
