@@ -225,32 +225,3 @@ func CompressName(buf *bytes.Buffer, sufpos map[string]int, bytename []byte) err
 	fmt.Println(sufpos)
 	return nil
 }
-
-// name := strings.Split(string(m.Question[i].Name), ".")
-// var (
-// 	suffix string
-// 	trunc  int
-// 	nxoff  int
-// )
-// suffix = name[len(name)-1]
-// sufpos[suffix] = len(name) - 1 + buf.Len()
-// for j := len(name) - 2; j >= 0; j-- {
-// 	suffix = name[j] + "." + suffix
-// 	if _, ok := sufpos[suffix]; ok == false {
-// 		sufpos[suffix] = j + buf.Len()
-// 	} else {
-// 		trunc = j
-// 		nxoff = sufpos[suffix]
-// 	}
-// }
-// for j := 0; j < trunc; j++ {
-// 	buf.WriteByte(byte(len(name[j])))
-// 	buf.Write([]byte(name[j]))
-// }
-// tmp := make([]byte, 2)
-// if nxoff > 0x3fff {
-// 	return nil, errors.New("Offset out of range")
-// }
-// tmp[0] = uint8(0xc0 | (nxoff>>8)&0xff)
-// tmp[1] = uint8(nxoff & 0xff)
-// buf.Write(tmp)
