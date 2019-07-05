@@ -3,23 +3,24 @@ package RType
 type Type = uint16
 
 const (
-	A Type = iota + 1
+	A Type = iota + 1 // 1
 	NS
 	MD
 	MF
 	CNAME
-	SOA
+	SOA // 6
 	MB
 	MG
 	MR
 	// (Experimental)
 	NULL
-	WKS
+	WKS // b
 	PTR
 	HINFO
 	MINFO
 	MX
-	TXT
+	TXT // 10
 
-	OPT Type = 41
+	AAAA Type = 28
+	OPT  Type = 41
 )

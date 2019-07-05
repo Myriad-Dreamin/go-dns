@@ -87,54 +87,50 @@ func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
 		return 0, err
 	}
 	a.Type = binary.BigEndian.Uint16(b)
+
+	// a.Type
 	cnt += 2
+
 	if b, err = ReadnBytes(buffer, 2); err != nil {
 		return 0, err
 	}
 	a.Class = binary.BigEndian.Uint16(b)
+
+	// a.Class
 	cnt += 2
+
 	if b, err = ReadnBytes(buffer, 4); err != nil {
 		return 0, err
 	}
 	a.TTL = binary.BigEndian.Uint32(b)
+
+	// a.TTL
 	cnt += 4
 	if b, err = ReadnBytes(buffer, 2); err != nil {
 		return 0, err
 	}
 	a.RDLength = binary.BigEndian.Uint16(b)
+
+	// a.RDLength
 	cnt += 2
-	cnt += int(a.RDLength)
+
 	switch a.Type {
-	case 0x01:
-		a.RDData, err = ReadnBytes(buffer, int(a.RDLength))
-	case 0x02:
-		data, _, err := GetStringFullName(bs, offset+cnt)
+	case rtype.NS, rtype.CNAME, rtype.SOA:
+		a.RDData, _, err = GetStringFullName(bs, offset+cnt)
 		if err != nil {
 			return 0, err
 		}
-		a.RDData, err = ToDNSDomainName(data)
-		a.RDLength = uint16(len(a.RDData))
-	case 0x05:
-		data, _, err := GetStringFullName(bs, offset+cnt)
-		if err != nil {
-			return 0, err
-		}
-		a.RDData, err = ToDNSDomainName(data)
-		a.RDLength = uint16(len(a.RDData))
-	case 0x1c:
-		a.RDData, err = ReadnBytes(buffer, int(a.RDLength))
+	case rtype.A, rtype.AAAA:
+		fallthrough
 	default:
-		return 0, errors.New("Resource type not supported")
-	}
-	if err != nil {
-		return 0, err
-	}
-	if a.Type == rtype.CNAME {
-		a.RDData, l, err = GetStringFullName(bs, offset+cnt)
+		a.RDData, err = ReadnBytes(buffer, int(a.RDLength))
 		if err != nil {
 			return 0, err
 		}
+		// return 0, errors.New("Resource type not supported")
 	}
+
+	// a.Data
 	cnt += int(a.RDLength)
 	return cnt, nil
 }
