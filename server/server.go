@@ -247,7 +247,7 @@ func (srv *Server) ServeUDPFromOut(tid uint16, b []byte) {
 	var message msg.DNSMessage
 	_, err = message.Read(b)
 
-	message.Print()
+	// message.Print()
 
 	if err != nil {
 		srv.logger.Errorf("failed read udp msg, error: " + err.Error())
@@ -273,12 +273,10 @@ func (srv *Server) ServeUDPFromOut(tid uint16, b []byte) {
 	b = srv.UDPReadBuffer[rid]
 
 	_, err = message.Read(b)
-	fmt.Println("converting", fid, "->", tid, message.Header.ID, "->", fid)
-	if tid != message.Header.ID {
-		srv.logger.Errorf("not matching..., serving %v", servingAddr)
-	}
-	fmt.Println("------")
-	message.Print()
+	// if tid != message.Header.ID {
+	// 	srv.logger.Errorf("not matching..., serving %v", servingAddr)
+	// }
+	// message.Print()
 	message.Header.ID = fid
 	b, err = message.CompressToBytes()
 

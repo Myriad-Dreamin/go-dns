@@ -3,7 +3,6 @@ package msg
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"strings"
 
 	rtype "github.com/Myriad-Dreamin/go-dns/msg/rec/rtype"
@@ -45,7 +44,7 @@ func (ctx *ReplyContext) CompressName(bytename []byte, reserveSpace int) ([]byte
 		prelen int
 		flag   bool
 	)
-	fmt.Println(ctx.SuffixMap)
+	// fmt.Println(ctx.SuffixMap)
 	trunc = len(name)
 
 	if trunc == 1 {
@@ -64,7 +63,7 @@ func (ctx *ReplyContext) CompressName(bytename []byte, reserveSpace int) ([]byte
 			prelen -= len(name[j]) + 1
 		}
 		if _, ok := ctx.SuffixMap[suffix]; ok == false {
-			fmt.Println(suffix)
+			// fmt.Println(suffix)
 			ctx.SuffixMap[suffix] = offset + prelen
 		} else {
 			flag = true
@@ -72,11 +71,11 @@ func (ctx *ReplyContext) CompressName(bytename []byte, reserveSpace int) ([]byte
 			nxoff = ctx.SuffixMap[suffix]
 		}
 	}
-	fmt.Println(trunc)
+	// fmt.Println(trunc)
 	if flag {
 		for j := 0; j < trunc; j++ {
-			fmt.Println(len(name[j]))
-			fmt.Printf("%x\n", byte(len(name[j])))
+			// fmt.Println(len(name[j]))
+			// fmt.Printf("%x\n", byte(len(name[j])))
 			buf.WriteByte(byte(len(name[j])))
 			buf.Write([]byte(name[j]))
 		}
@@ -89,14 +88,14 @@ func (ctx *ReplyContext) CompressName(bytename []byte, reserveSpace int) ([]byte
 		buf.Write(tmp)
 	} else {
 		for j := 0; j < len(name); j++ {
-			fmt.Println(len(name[j]))
-			fmt.Printf("%x\n", byte(len(name[j])))
+			// fmt.Println(len(name[j]))
+			// fmt.Printf("%x\n", byte(len(name[j])))
 			buf.WriteByte(byte(len(name[j])))
 			buf.Write([]byte(name[j]))
 		}
 		buf.WriteByte(byte(0))
 	}
-	fmt.Println(ctx.SuffixMap)
+	// fmt.Println(ctx.SuffixMap)
 	return buf.Bytes(), nil
 }
 
@@ -104,7 +103,7 @@ func (ctx *ReplyContext) InsertName(b []byte) (err error) {
 	if b, err = ctx.CompressName(b, 0); err != nil {
 		return
 	}
-	fmt.Println("getting name", b)
+	// fmt.Println("getting name", b)
 	ctx.Buf.Write(b)
 	return
 }
@@ -113,7 +112,7 @@ func (ctx *ReplyContext) InsertNameWithLength(b []byte) (err error) {
 	if b, err = ctx.CompressName(b, 2); err != nil {
 		return
 	}
-	fmt.Println("getting compressing name", uint16(len(b)), b)
+	// fmt.Println("getting compressing name", uint16(len(b)), b)
 	ctx.Buf.Write(uint16(len(b)))
 	ctx.Buf.Write(b)
 	return
@@ -157,7 +156,7 @@ func (ctx *ReplyContext) InsertAnswer(a DNSAnswer) (err error) {
 	// TODO: Test a.Type
 
 	if a.Type == rtype.CNAME {
-		fmt.Println("compressing cname", string(a.RDData))
+		// fmt.Println("compressing cname", string(a.RDData))
 		if err = ctx.InsertNameWithLength(a.RDData); err != nil {
 			return
 		}
