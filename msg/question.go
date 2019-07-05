@@ -139,16 +139,6 @@ func (q *DNSQuestion) ToBytes() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (q *DNSQuestion) NoNameToBytes() ([]byte, error) {
-	var buf bytes.Buffer
-	tmp := make([]byte, 2)
-	binary.BigEndian.PutUint16(tmp, q.Type)
-	buf.Write(tmp)
-	binary.BigEndian.PutUint16(tmp, q.Class)
-	buf.Write(tmp)
-	return buf.Bytes(), nil
-}
-
 func (q *DNSQuestion) RedisKey() (string, error) {
 	sname := string(q.Name)
 	stype, err := q.SType()

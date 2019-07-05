@@ -2,7 +2,6 @@ package msg
 
 import (
 	"bytes"
-	"fmt"
 	flags "github.com/Myriad-Dreamin/go-dns/msg/flags"
 )
 
@@ -33,11 +32,6 @@ type DNSMessage struct {
 	Additional []DNSAnswer
 }
 
-type Context struct {
-	Message      DNSMessage
-	additionSize uint16
-}
-
 // Assuming Empty Message
 func (m *DNSMessage) InitQuery(msgid uint16) {
 	m.Header.ID = msgid
@@ -49,15 +43,33 @@ func (m *DNSMessage) InitRecursivelyQuery(msgid uint16) {
 	m.Header.Flags = flags.RD
 }
 
-func NewDNSMessageQuery(msgid uint16) (m *DNSMessage) {
+func NewEmptyDNSMessageQuery(msgid uint16) (m *DNSMessage) {
 	m = new(DNSMessage)
 	m.InitQuery(msgid)
 	return
 }
 
-func NewDNSMessageRecursivelyQuery(msgid uint16) (m *DNSMessage) {
+func NewDNSMessageQuery(msgid uint16, que []DNSQuestion) (n int, m *DNSMessage) {
+	c := new(QuestContext)
+	c.Message.InitQuery(msgid)
+	c.additionSize = c.Message.Header.Size()
+	n = c.PacketQuestion(que)
+	m = &c.Message
+	return
+}
+
+func NewEmptyDNSMessageRecursivelyQuery(msgid uint16) (m *DNSMessage) {
 	m = new(DNSMessage)
 	m.InitRecursivelyQuery(msgid)
+	return
+}
+
+func NewDNSMessageRecursivelyQuery(msgid uint16, que []DNSQuestion) (n int, m *DNSMessage) {
+	c := new(QuestContext)
+	c.Message.InitRecursivelyQuery(msgid)
+	c.additionSize = c.Message.Header.Size()
+	n = c.PacketQuestion(que)
+	m = &c.Message
 	return
 }
 
@@ -151,8 +163,6 @@ func (m *DNSMessage) ToBytes() (b []byte, err error) {
 	}
 	for i := 0; i < int(m.Header.ANCount); i++ {
 		b, err := m.Answer[i].ToBytes()
-		m.Answer[i].Print()
-		fmt.Printf("\n\n")
 		if err != nil {
 			return nil, err
 		}
@@ -175,117 +185,6 @@ func (m *DNSMessage) ToBytes() (b []byte, err error) {
 	return buf.Bytes(), nil
 }
 
-func (m *DNSMessage) CompressToBytes() (b []byte, err error) {
-	var buf bytes.Buffer
-	var sufpos map[string]int
-	sufpos = make(map[string]int)
-	buf.Write(m.Header.ToBytes())
-	for _, que := range m.Question {
-		if err = CompressName(&buf, sufpos, que.Name); err != nil {
-			return nil, err
-		}
-		b, err = que.NoNameToBytes()
-		if err != nil {
-			return nil, err
-		}
-		buf.Write(b)
-	}
-	for _, ans := range m.Answer {
-		if err = CompressName(&buf, sufpos, ans.Name); err != nil {
-			return nil, err
-		}
-		b, err = ans.NoNameToBytes()
-		if err != nil {
-			return nil, err
-		}
-		buf.Write(b)
-	}
-	for _, auth := range m.Authority {
-		if err = CompressName(&buf, sufpos, auth.Name); err != nil {
-			return nil, err
-		}
-		b, err = auth.NoNameToBytes()
-		if err != nil {
-			return nil, err
-		}
-		buf.Write(b)
-	}
-	for _, add := range m.Additional {
-		if err = CompressName(&buf, sufpos, add.Name); err != nil {
-			return nil, err
-		}
-		b, err = add.NoNameToBytes()
-		if err != nil {
-			return nil, err
-		}
-		buf.Write(b)
-	}
-	return buf.Bytes(), nil
-}
-
-func NewDNSMessageContextQuery(msgid uint16, que []DNSQuestion) (n int, m *DNSMessage) {
-	c := new(Context)
-	c.Message.InitQuery(msgid)
-	c.additionSize = c.Message.Header.Size()
-	n = c.PacketQuestion(que)
-	m = &c.Message
-	return
-}
-
-func NewDNSMessageContextRecursivelyQuery(msgid uint16, que []DNSQuestion) (n int, m *DNSMessage) {
-	c := new(Context)
-	c.Message.InitRecursivelyQuery(msgid)
-	c.additionSize = c.Message.Header.Size()
-	n = c.PacketQuestion(que)
-	m = &c.Message
-	return
-}
-
-func (m *Context) PacketQuestion(question []DNSQuestion) int {
-	for i, q := range question {
-		if !m.InsertQuestion(q) {
-			return i
-		}
-	}
-	return len(question)
-}
-
-func (m *Context) InsertQuestion(que DNSQuestion) bool {
-	var qs = que.Size()
-	if m.additionSize+qs > maxMessageSize {
-		return false
-	}
-	m.Message.InsertQuestion(que)
-	m.additionSize += qs
-	return true
-}
-
-func (m *Context) InsertAnswer(ans DNSAnswer) bool {
-	var qs = ans.Size()
-	if m.additionSize+qs > maxMessageSize {
-		return false
-	}
-	m.Message.InsertAnswer(ans)
-	m.additionSize += qs
-	return true
-}
-
-func (m *Context) InsertAuthority(ans DNSAnswer) bool {
-	var qs = ans.Size()
-	if m.additionSize+qs > maxMessageSize {
-		return false
-	}
-	m.Message.InsertAuthority(ans)
-	m.additionSize += qs
-	return true
-}
-
-func (m *Context) InsertAdditional(ans DNSAnswer) bool {
-	var qs = ans.Size()
-	if m.additionSize+qs > maxMessageSize {
-		return false
-	}
-	m.Message.InsertAdditional(ans)
-	m.additionSize += qs
-	return true
+func (m *DNSMessage) CompressToBytes() ([]byte, error) {
+	return NewReplyContext(m).Bytes()
 }

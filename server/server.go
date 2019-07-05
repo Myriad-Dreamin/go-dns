@@ -148,6 +148,24 @@ func (srv *Server) ListenAndServe(host string) (err error) {
 	}
 }
 
+/*
+0003 8180 0001000200010001 0763617074636861056774696d6703636f6d00001c0001
+490a 8180 0001000200010001 0763617074636861056774696d6703636f6d00001c0001
+c00c
+                                       000500010000012c002007636170746368610567
+‘0763617074636861056774696d6703636f6d00
+'0763617074636861056774696d6703636f6d00000500010000012c002007636170746368610567
+
+
+74696d6703636f6d05636c6f7564027463027171c01ac02f0005000100000201000b03703231047463646ec04ac05f00060001000000c5002a076e732d63646e31c04a097765626d6173746572c04a4fd6eede0000012c00000258000151800000012c000029100000000000001c000a00182bf4de06c37af48ac70b0f605d1efbf7ab21838eea49ec19
+
+74696d6703636f6d05636c6f7564027463027171c01a0763617074636861056774696d6703636f
+6d05636c6f756402746302717103636f6d000005000100000201000b03703231047463646ec04a
+047463646e02717103636f6d0000060001000000c5002a076e732d63646e31c04a097765626d61
+73746572c04a4fd6eede0000012c00000258000151800000012c000029100000000000001c000a
+00182bf4de06c37af48ac70b0f605d1efbf7ab21838eea49ec19
+*/
+
 func (srv *Server) LookUpA(host, req string) (ret string, err error) {
 
 	if err = srv.tryConnectToRemoteDNSServer(host + ":53"); err != nil {
@@ -169,7 +187,7 @@ func (srv *Server) LookUpA(host, req string) (ret string, err error) {
 	)
 
 	for len(request) != 0 {
-		n, s := msg.NewDNSMessageContextRecursivelyQuery(1, request)
+		n, s := msg.NewDNSMessageRecursivelyQuery(1, request)
 		request = request[n:]
 
 		fmt.Println(n, s)
@@ -235,7 +253,7 @@ func (srv *Server) ServeUDPFromOut(tid uint16, b []byte) {
 	srv.logger.Infof("new message incoming: id, address: %v, %v", message.Header.ID, servingAddr)
 	fid := message.Header.ID
 	message.Header.ID = tid
-	b, err = message.ToBytes()
+	b, err = message.CompressToBytes()
 	// b[0] = byte(tid >> 8)
 	// b[1] = byte(tid & 0xff)
 	if err != nil {
@@ -251,10 +269,13 @@ func (srv *Server) ServeUDPFromOut(tid uint16, b []byte) {
 	defer srv.ReleaseUDPReadRoutine(rid)
 	b = srv.UDPReadBuffer[rid]
 
-	message = msg.DNSMessage{}
 	_, err = message.Read(b)
+	fmt.Println("converting", fid, "->", tid, message.Header.ID, "->", fid)
+	if tid != message.Header.ID {
+		srv.logger.Errorf("not matching..., serving %v", servingAddr)
+	}
 	message.Header.ID = fid
-	b, err = message.ToBytes()
+	b, err = message.CompressToBytes()
 
 	// b[0] = byte(fid >> 8)
 	// b[1] = byte(fid & 0xff)
