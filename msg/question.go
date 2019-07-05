@@ -5,7 +5,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+
 	QClass "github.com/Myriad-Dreamin/go-dns/msg/rec/qclass"
+	mdnet "github.com/Myriad-Dreamin/go-dns/net"
 )
 
 /*
@@ -76,6 +78,7 @@ func (q *DNSQuestion) ReadFrom(bs []byte, offset int) (int, error) {
 	}
 	q.Class = binary.BigEndian.Uint16(b)
 	cnt += 2
+
 	return cnt, nil
 }
 
@@ -125,17 +128,14 @@ func (q *DNSQuestion) SType() (string, error) {
 }
 
 func (q *DNSQuestion) ToBytes() ([]byte, error) {
-	var buf bytes.Buffer
-	tmp := make([]byte, 2)
+	var buf = mdnet.NewIO()
 	b, err := ToDNSDomainName(q.Name)
 	if err != nil {
 		return nil, err
 	}
 	buf.Write(b)
-	binary.BigEndian.PutUint16(tmp, q.Type)
-	buf.Write(tmp)
-	binary.BigEndian.PutUint16(tmp, q.Class)
-	buf.Write(tmp)
+	buf.Write(q.Type)
+	buf.Write(q.Class)
 	return buf.Bytes(), nil
 }
 
