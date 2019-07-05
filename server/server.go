@@ -43,8 +43,31 @@ func (srv *Server) SetLogger(mLogger *log.Logger) {
 	})
 }
 
+func ParseUDPDNSIP6(host string) string {
+	if _, err := net.ResolveUDPAddr("udp6", host); err == nil {
+		return host
+	} else {
+		return host
+	}
+}
+
+func ResolveUDPDNSIP(host string) (string, string) {
+	if _, err := net.ResolveUDPAddr("udp4", host); err == nil {
+		return "udp", host
+	} else if _, err := net.ResolveIPAddr("ip4", host); err == nil {
+		return "udp", host + ":53"
+	} else if ip := net.ParseIP(host); ip != nil {
+		return "udp6", "[" + ip.String() + "]:53"
+	} else {
+		return "udp6", ParseUDPDNSIP6(host)
+	}
+}
+
 func (srv *Server) tryConnectToRemoteDNSServer(host string) (err error) {
-	srv.remoteConn, err = net.Dial("udp", host)
+	fmt.Println(ResolveUDPDNSIP("114.114.114.114:53"))
+	fmt.Println(host)
+	network, host := ResolveUDPDNSIP(host)
+	srv.remoteConn, err = net.Dial(network, host)
 
 	if err != nil {
 		srv.logger.Errorf("error occurred when dial remote dns server: %v\n", err)
@@ -75,7 +98,7 @@ func (srv *Server) ListenAndServe(host string) (err error) {
 		return
 	}
 
-	if err = srv.tryConnectToRemoteDNSServer(host + ":53"); err != nil {
+	if err = srv.tryConnectToRemoteDNSServer(host); err != nil {
 		return
 	}
 
@@ -128,6 +151,7 @@ func (srv *Server) ListenAndServe(host string) (err error) {
 }
 
 func (srv *Server) LookUpA(host, req string) (ret string, err error) {
+
 	if err = srv.tryConnectToRemoteDNSServer(host + ":53"); err != nil {
 		return
 	}
@@ -215,9 +239,9 @@ func (srv *Server) ServeUDPFromOut(tid uint16, b []byte) {
 	srv.logger.Infof("new message incoming: id, address: %v, %v", message.Header.ID, servingAddr)
 	fid := message.Header.ID
 	message.Header.ID = tid
-	// b, err = message.ToBytes()
-	b[0] = byte(tid >> 8)
-	b[1] = byte(tid & 0xff)
+	b, err = message.ToBytes()
+	// b[0] = byte(tid >> 8)
+	// b[1] = byte(tid & 0xff)
 	if err != nil {
 		srv.logger.Errorf("convert error: %v", err)
 		return
@@ -232,9 +256,9 @@ func (srv *Server) ServeUDPFromOut(tid uint16, b []byte) {
 
 	_, err = message.Read(b)
 	message.Header.ID = fid
-	// b, err = message.ToBytes()
-	b[0] = byte(fid >> 8)
-	b[1] = byte(fid & 0xff)
+	b, err = message.ToBytes()
+	// b[0] = byte(fid >> 8)
+	// b[1] = byte(fid & 0xff)
 	if err != nil {
 		srv.logger.Errorf("convert error: %v", err)
 		return

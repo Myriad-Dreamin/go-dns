@@ -1,0 +1,1 @@
+cli -lscr server start
