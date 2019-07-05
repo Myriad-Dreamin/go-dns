@@ -3,7 +3,9 @@ package msg
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
+	"strings"
 
 	mdnet "github.com/Myriad-Dreamin/go-dns/net"
 )
@@ -160,3 +162,92 @@ func ToDNSDomainName(dnm []byte) ([]byte, error) {
 		rw.Write(d)
 	}
 }
+
+func CompressName(buf *bytes.Buffer, sufpos map[string]int, bytename []byte) error {
+	name := strings.Split(string(bytename), ".")
+	var (
+		suffix string
+		trunc  int
+		nxoff  int
+		offset int
+		prelen int
+		flag   bool
+	)
+	fmt.Println(sufpos)
+	suffix = name[len(name)-1]
+	// trunc = len(name)
+	offset = buf.Len()
+	prelen = len(bytename)
+	for j := len(name) - 1; j >= 0; j-- {
+		if j == len(name)-1 {
+			suffix = name[j]
+			prelen -= len(name[j])
+		} else {
+			suffix = name[j] + "." + suffix
+			prelen -= len(name[j]) + 1
+		}
+		if _, ok := sufpos[suffix]; ok == false {
+			fmt.Println(suffix)
+			sufpos[suffix] = offset + prelen
+		} else {
+			flag = true
+			trunc = j
+			nxoff = sufpos[suffix]
+		}
+	}
+	fmt.Println(trunc)
+	if flag {
+		for j := 0; j < trunc; j++ {
+			fmt.Println(len(name[j]))
+			fmt.Printf("%x\n", byte(len(name[j])))
+			buf.WriteByte(byte(len(name[j])))
+			buf.Write([]byte(name[j]))
+		}
+		tmp := make([]byte, 2)
+		if nxoff > 0x3fff {
+			return errors.New("Offset out of range")
+		}
+		tmp[0] = uint8(0xc0 | (nxoff>>8)&0xff)
+		tmp[1] = uint8(nxoff & 0xff)
+		buf.Write(tmp)
+	} else {
+		for j := 0; j < len(name); j++ {
+			fmt.Println(len(name[j]))
+			fmt.Printf("%x\n", byte(len(name[j])))
+			buf.WriteByte(byte(len(name[j])))
+			buf.Write([]byte(name[j]))
+		}
+		buf.WriteByte(byte(0))
+	}
+	fmt.Println(sufpos)
+	return nil
+}
+
+// name := strings.Split(string(m.Question[i].Name), ".")
+// var (
+// 	suffix string
+// 	trunc  int
+// 	nxoff  int
+// )
+// suffix = name[len(name)-1]
+// sufpos[suffix] = len(name) - 1 + buf.Len()
+// for j := len(name) - 2; j >= 0; j-- {
+// 	suffix = name[j] + "." + suffix
+// 	if _, ok := sufpos[suffix]; ok == false {
+// 		sufpos[suffix] = j + buf.Len()
+// 	} else {
+// 		trunc = j
+// 		nxoff = sufpos[suffix]
+// 	}
+// }
+// for j := 0; j < trunc; j++ {
+// 	buf.WriteByte(byte(len(name[j])))
+// 	buf.Write([]byte(name[j]))
+// }
+// tmp := make([]byte, 2)
+// if nxoff > 0x3fff {
+// 	return nil, errors.New("Offset out of range")
+// }
+// tmp[0] = uint8(0xc0 | (nxoff>>8)&0xff)
+// tmp[1] = uint8(nxoff & 0xff)
+// buf.Write(tmp)

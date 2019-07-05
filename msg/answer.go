@@ -185,6 +185,22 @@ func (a *DNSAnswer) ToBytes() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+func (a *DNSAnswer) NoNameToBytes() ([]byte, error) {
+	var buf bytes.Buffer
+	tmp2 := make([]byte, 2)
+	tmp4 := make([]byte, 4)
+	binary.BigEndian.PutUint16(tmp2, a.Type)
+	buf.Write(tmp2)
+	binary.BigEndian.PutUint16(tmp2, a.Class)
+	buf.Write(tmp2)
+	binary.BigEndian.PutUint32(tmp4, a.TTL)
+	buf.Write(tmp4)
+	binary.BigEndian.PutUint16(tmp2, a.RDLength)
+	buf.Write(tmp2)
+	buf.Write(a.RDData)
+	return buf.Bytes(), nil
+}
+
 func (a *DNSAnswer) SType() (string, error) {
 	stype, suc := typename[a.Type]
 	if suc != true {

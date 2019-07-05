@@ -172,6 +172,54 @@ func (m *DNSMessage) ToBytes() (b []byte, err error) {
 	return buf.Bytes(), nil
 }
 
+func (m *DNSMessage) CompressToBytes() (b []byte, err error) {
+	var buf bytes.Buffer
+	var sufpos map[string]int
+	sufpos = make(map[string]int)
+	buf.Write(m.Header.ToBytes())
+	for _, que := range m.Question {
+		if err = CompressName(&buf, sufpos, que.Name); err != nil {
+			return nil, err
+		}
+		b, err = que.NoNameToBytes()
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(b)
+	}
+	for _, ans := range m.Answer {
+		if err = CompressName(&buf, sufpos, ans.Name); err != nil {
+			return nil, err
+		}
+		b, err = ans.NoNameToBytes()
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(b)
+	}
+	for _, auth := range m.Authority {
+		if err = CompressName(&buf, sufpos, auth.Name); err != nil {
+			return nil, err
+		}
+		b, err = auth.NoNameToBytes()
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(b)
+	}
+	for _, add := range m.Additional {
+		if err = CompressName(&buf, sufpos, add.Name); err != nil {
+			return nil, err
+		}
+		b, err = add.NoNameToBytes()
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(b)
+	}
+	return buf.Bytes(), nil
+}
+
 func NewDNSMessageContextQuery(msgid uint16, que []DNSQuestion) (n int, m *DNSMessage) {
 	c := new(Context)
 	c.Message.InitQuery(msgid)

@@ -59,7 +59,7 @@ func (srv *ServerX) SetLog(loggerFactory *log.Logger) {
 }
 
 func (srv *ServerX) Before(c *urcli.Context) (err error) {
-	srv.logfile, err = os.OpenFile(srv.logfiledir, os.O_APPEND|os.O_CREATE, 666)
+	srv.logfile, err = os.OpenFile(srv.logfiledir, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 666)
 	if err != nil {
 		srv.logfile = nil
 		return err
