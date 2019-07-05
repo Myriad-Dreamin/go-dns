@@ -1,0 +1,30 @@
+# go-dns toml sample
+
+;;;;;;;;;;;;;;;;;;;
+; About php.ini   ;
+;;;;;;;;;;;;;;;;;;;
+###################
+#  go-dns.toml    #
+###################
+
+# 配置对应的Server配置
+# Redis配置等
+
+[server]
+
+# 设定当前的服务器网络类型，默认为UDP ipv4
+# server_network_type = "udp4"
+# 设定默认的主（上游）DNS服务器
+# default_remote_server_address = "223.5.5.5"
+
+
+# udp_range和tcp_range的和不能超过65536，因为关乎同时启用的线程个数，应当适量设定
+# udp_range代表同时服务的最大UDP连接数
+# udp_range = 200
+# udp_buffer_size代表服务器允许的最大DNS包长度
+# udp_buffer_size = 520
+
+# tcp_range代表同时服务的最大TCP连接数
+# tcp_range = 10
+# tcp_buffer_size代表服务器允许的最大DNS包长度
+# tcp_buffer_size = 50000
