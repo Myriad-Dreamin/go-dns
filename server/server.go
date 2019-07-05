@@ -64,8 +64,6 @@ func ResolveUDPDNSIP(host string) (string, string) {
 }
 
 func (srv *Server) tryConnectToRemoteDNSServer(host string) (err error) {
-	fmt.Println(ResolveUDPDNSIP("114.114.114.114:53"))
-	fmt.Println(host)
 	network, host := ResolveUDPDNSIP(host)
 	srv.remoteConn, err = net.Dial(network, host)
 
@@ -221,7 +219,6 @@ func (srv *Server) ServeUDPReadFromOut(tid uint16, b []byte) {
 		srv.logger.Errorf("read error: %v", err)
 		return
 	}
-	fmt.Println("receiving", (uint16(b[0])<<8)+uint16(b[1]))
 	srv.UDPReadBytesChan[(uint16(b[0])<<8)+uint16(b[1])] <- tid
 }
 
@@ -231,7 +228,6 @@ func (srv *Server) ServeUDPFromOut(tid uint16, b []byte) {
 
 	var message msg.DNSMessage
 	_, err = message.Read(b)
-
 	if err != nil {
 		srv.logger.Errorf("failed read udp msg, error: " + err.Error())
 		return
@@ -246,6 +242,7 @@ func (srv *Server) ServeUDPFromOut(tid uint16, b []byte) {
 		srv.logger.Errorf("convert error: %v", err)
 		return
 	}
+
 	if _, err := srv.remoteConn.Write(b); err != nil {
 		srv.logger.Errorf("write error: %v", err)
 		return
@@ -254,9 +251,11 @@ func (srv *Server) ServeUDPFromOut(tid uint16, b []byte) {
 	defer srv.ReleaseUDPReadRoutine(rid)
 	b = srv.UDPReadBuffer[rid]
 
+	message = msg.DNSMessage{}
 	_, err = message.Read(b)
 	message.Header.ID = fid
 	b, err = message.ToBytes()
+
 	// b[0] = byte(fid >> 8)
 	// b[1] = byte(fid & 0xff)
 	if err != nil {

@@ -136,6 +136,9 @@ func GetStringFullName(bs []byte, offset int) ([]byte, int, error) {
 
 // todo: ignoring the case of '\.'
 func ToDNSDomainName(dnm []byte) ([]byte, error) {
+	if dnm == nil {
+		return []byte{0}, nil
+	}
 	var rw = mdnet.NewIO()
 	var bf = bytes.NewBuffer(dnm)
 	for {
