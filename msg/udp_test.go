@@ -24,11 +24,10 @@ func TestUdp(t *testing.T) {
 		return
 	}
 	var msgMessage DNSMessage
-	var recvMessage DNSMessage
+	// var recvMessage DNSMessage
 
 	msgMessage.Read(bytesData)
-
-	dns := "192.168.1.1:53"
+	dns := "223.5.5.5:53"
 	// dns := "192.168.0.1:53"
 	local := "127.0.0.1:55555"
 	_, err = net.ResolveUDPAddr("udp", local)
@@ -50,15 +49,20 @@ func TestUdp(t *testing.T) {
 		if err != nil {
 			fmt.Println("Error: ", err)
 		}
-		n, err := conn.Write(bs)
+
+		fmt.Println("god message convert!")
+
+		_, err = conn.Write(bs)
 		if err != nil {
 			fmt.Println("Error: ", err)
 		}
+		fmt.Println("god message write!")
 
-		buf := make([]byte, 1024)
-		n, err = conn.Read(buf)
-		recvMessage.Read(buf[:n])
-		recvMessage.Print()
+		// buf := make([]byte, 1024)
+		// n, err = conn.Read(buf)
+		// fmt.Println("god message read!")
+		// recvMessage.Read(buf[:n])
+		// recvMessage.Print()
 		break
 	}
 	// fmt.Printf("%x\n", msgMessage.ToBytes())

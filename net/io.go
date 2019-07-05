@@ -10,6 +10,7 @@ var (
 
 type PacketableBuffer interface {
 	io.ReadWriter
+	Len() int
 	Bytes() []byte
 	String() string
 }
@@ -48,6 +49,10 @@ func (rw *IO) Write(b interface{}) error {
 
 func (rw *IO) Read(b interface{}) error {
 	return binary.Read(rw.Buffer, rw.Endian, b)
+}
+
+func (rw *IO) Len() int {
+	return rw.Buffer.Len()
 }
 
 func (rw *IO) Bytes() []byte {
