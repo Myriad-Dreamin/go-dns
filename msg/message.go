@@ -2,6 +2,7 @@ package msg
 
 import (
 	"bytes"
+	"fmt"
 	flags "github.com/Myriad-Dreamin/go-dns/msg/flags"
 )
 
@@ -150,6 +151,8 @@ func (m *DNSMessage) ToBytes() (b []byte, err error) {
 	}
 	for i := 0; i < int(m.Header.ANCount); i++ {
 		b, err := m.Answer[i].ToBytes()
+		m.Answer[i].Print()
+		fmt.Printf("\n\n")
 		if err != nil {
 			return nil, err
 		}

@@ -101,11 +101,32 @@ func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
 	}
 	a.RDLength = binary.BigEndian.Uint16(b)
 	cnt += 2
-	a.RDData, err = ReadnBytes(buffer, int(a.RDLength))
+	cnt += int(a.RDLength)
+	switch a.Type {
+	case 0x01:
+		a.RDData, err = ReadnBytes(buffer, int(a.RDLength))
+	case 0x02:
+		data, _, err := GetStringFullName(bs, offset+cnt)
+		if err != nil {
+			return 0, err
+		}
+		a.RDData, err = ToDNSDomainName(data)
+		a.RDLength = uint16(len(a.RDData))
+	case 0x05:
+		data, _, err := GetStringFullName(bs, offset+cnt)
+		if err != nil {
+			return 0, err
+		}
+		a.RDData, err = ToDNSDomainName(data)
+		a.RDLength = uint16(len(a.RDData))
+	case 0x1c:
+		a.RDData, err = ReadnBytes(buffer, int(a.RDLength))
+	default:
+		return 0, errors.New("Resource type not supported")
+	}
 	if err != nil {
 		return 0, err
 	}
-	cnt += int(a.RDLength)
 	return cnt, nil
 }
 
