@@ -1,5 +1,18 @@
 package msg
 
+import (
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"fmt"
+	"math/rand"
+	"strconv"
+	"time"
+
+	rtype "github.com/Myriad-Dreamin/go-dns/msg/rec/rtype"
+	mdnet "github.com/Myriad-Dreamin/go-dns/net"
+)
+
 /*
                                         1  1  1  1  1  1
           0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
@@ -48,29 +61,39 @@ RDATA           a variable length string of octets that describes the
                 For example, the if the TYPE is A and the CLASS is IN,
                 the RDATA field is a 4 octet ARPA Internet address.
 */
-import (
-	"bytes"
-	"encoding/binary"
-	"errors"
-	"fmt"
-	"math/rand"
-	"strconv"
-	"time"
-
-	rtype "github.com/Myriad-Dreamin/go-dns/msg/rec/rtype"
-)
-
 type DNSAnswer struct {
 	Name     []byte
 	Type     uint16
 	Class    uint16
 	TTL      uint32
 	RDLength uint16
-	RDData   []byte
+	RDData   interface{}
+}
+
+type SOA struct {
+	PrimaryNS       []byte
+	MailTo          []byte
+	SerialNumber    uint32
+	RefreshInterval uint32
+	RetryInterval   uint32
+	ExpireLimit     uint32
+	MinimumTTL      uint32
+}
+
+func (soa *SOA) Len() int {
+	return len(soa.PrimaryNS) + len(soa.MailTo) + 10
 }
 
 func (a DNSAnswer) Size() uint16 {
-	return uint16(len(a.Name) + len(a.RDData) + 10)
+	switch rdata := a.RDData.(type) {
+	case []byte:
+		return uint16(len(a.Name) + len(rdata) + 10)
+	case SOA:
+		return uint16(len(a.Name) + rdata.Len() + 10)
+	default:
+		panic("???? RDData Must...")
+	}
+
 }
 
 func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
@@ -115,11 +138,34 @@ func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
 	cnt += 2
 
 	switch a.Type {
-	case rtype.NS, rtype.CNAME, rtype.SOA:
+	case rtype.NS, rtype.CNAME:
 		a.RDData, _, err = GetStringFullName(bs, offset+cnt)
 		if err != nil {
 			return 0, err
 		}
+	case rtype.SOA:
+		var l2, l3 int
+		rdata := new(SOA)
+		rdata.PrimaryNS, l, err = GetStringFullName(bs, offset+cnt)
+		if err != nil {
+			return 0, err
+		}
+		rdata.MailTo, l2, err = GetStringFullName(bs, offset+cnt+l)
+		if err != nil {
+			return 0, err
+		}
+		l3 = offset + cnt + l + l2
+		if l3+20 > len(bs) {
+			return 0, errors.New("overflow when decoding soa..")
+		}
+		rw := mdnet.NewIO()
+		rw.Write(bs[l3 : l3+20])
+		rw.Read(&rdata.SerialNumber)
+		rw.Read(&rdata.RefreshInterval)
+		rw.Read(&rdata.RetryInterval)
+		rw.Read(&rdata.ExpireLimit)
+		rw.Read(&rdata.MinimumTTL)
+		a.RDData = rdata
 	case rtype.A, rtype.AAAA:
 		fallthrough
 	default:
@@ -191,22 +237,16 @@ func (a *DNSAnswer) SName() (string, error) {
 }
 
 func (a *DNSAnswer) ToBytes() ([]byte, error) {
-	var buf bytes.Buffer
-	tmp2 := make([]byte, 2)
-	tmp4 := make([]byte, 4)
+	var buf = mdnet.NewIO()
 	b, err := ToDNSDomainName(a.Name)
 	if err != nil {
 		return nil, err
 	}
 	buf.Write(b)
-	binary.BigEndian.PutUint16(tmp2, a.Type)
-	buf.Write(tmp2)
-	binary.BigEndian.PutUint16(tmp2, a.Class)
-	buf.Write(tmp2)
-	binary.BigEndian.PutUint32(tmp4, a.TTL)
-	buf.Write(tmp4)
-	binary.BigEndian.PutUint16(tmp2, a.RDLength)
-	buf.Write(tmp2)
+	buf.Write(a.Type)
+	buf.Write(a.Class)
+	buf.Write(a.TTL)
+	buf.Write(a.RDLength)
 	buf.Write(a.RDData)
 	return buf.Bytes(), nil
 }

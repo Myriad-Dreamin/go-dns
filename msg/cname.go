@@ -23,6 +23,6 @@ func ToDNSCname(a *DNSAnswer) (DNSCname, error) {
 		return c, errors.New("Resource Record is not a cname type")
 	}
 	c.InitFrom(*a)
-	c.CNAME = a.RDData
+	c.CNAME = a.RDData.([]byte)
 	return c, nil
 }

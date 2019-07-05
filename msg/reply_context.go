@@ -118,6 +118,27 @@ func (ctx *ReplyContext) InsertNameWithLength(b []byte) (err error) {
 	return
 }
 
+func (ctx *ReplyContext) InsertSOA(soa *SOA) (err error) {
+	var b2, b3 []byte
+	if b2, err = ctx.CompressName(soa.PrimaryNS, 2); err != nil {
+		return
+	}
+
+	if b3, err = ctx.CompressName(soa.MailTo, 2+len(b2)); err != nil {
+		return
+	}
+
+	ctx.Buf.Write(uint16(len(b2) + len(b3) + 20))
+	ctx.Buf.Write(b2)
+	ctx.Buf.Write(b3)
+	ctx.Buf.Write(soa.SerialNumber)
+	ctx.Buf.Write(soa.RefreshInterval)
+	ctx.Buf.Write(soa.RetryInterval)
+	ctx.Buf.Write(soa.ExpireLimit)
+	ctx.Buf.Write(soa.MinimumTTL)
+	return
+}
+
 func (ctx *ReplyContext) InsertQuestion(q DNSQuestion) (err error) {
 	if err = ctx.InsertName(q.Name); err != nil {
 		return
@@ -155,15 +176,20 @@ func (ctx *ReplyContext) InsertAnswer(a DNSAnswer) (err error) {
 	*/
 	// TODO: Test a.Type
 
-	if a.Type == rtype.CNAME {
-		// fmt.Println("compressing cname", string(a.RDData))
-		if err = ctx.InsertNameWithLength(a.RDData); err != nil {
+	switch a.Type {
+	case rtype.CNAME, rtype.NS:
+		if err = ctx.InsertNameWithLength(a.RDData.([]byte)); err != nil {
 			return
 		}
-	} else {
+	case rtype.SOA:
+		if err = ctx.InsertSOA(a.RDData.(*SOA)); err != nil {
+			return
+		}
+	default:
 		ctx.Buf.Write(a.RDLength)
 		ctx.Buf.Write(a.RDData)
 	}
+
 	return
 }
 
