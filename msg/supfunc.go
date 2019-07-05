@@ -3,7 +3,7 @@ package msg
 import (
 	"bytes"
 	"errors"
-	"fmt"
+	//"fmt"
 	"io"
 	"strings"
 
@@ -176,7 +176,6 @@ func CompressName(buf *bytes.Buffer, sufpos map[string]int, bytename []byte) err
 		prelen int
 		flag   bool
 	)
-	fmt.Println(sufpos)
 	suffix = name[len(name)-1]
 	// trunc = len(name)
 	offset = buf.Len()
@@ -190,7 +189,6 @@ func CompressName(buf *bytes.Buffer, sufpos map[string]int, bytename []byte) err
 			prelen -= len(name[j]) + 1
 		}
 		if _, ok := sufpos[suffix]; ok == false {
-			fmt.Println(suffix)
 			sufpos[suffix] = offset + prelen
 		} else {
 			flag = true
@@ -198,11 +196,8 @@ func CompressName(buf *bytes.Buffer, sufpos map[string]int, bytename []byte) err
 			nxoff = sufpos[suffix]
 		}
 	}
-	fmt.Println(trunc)
 	if flag {
 		for j := 0; j < trunc; j++ {
-			fmt.Println(len(name[j]))
-			fmt.Printf("%x\n", byte(len(name[j])))
 			buf.WriteByte(byte(len(name[j])))
 			buf.Write([]byte(name[j]))
 		}
@@ -215,13 +210,10 @@ func CompressName(buf *bytes.Buffer, sufpos map[string]int, bytename []byte) err
 		buf.Write(tmp)
 	} else {
 		for j := 0; j < len(name); j++ {
-			fmt.Println(len(name[j]))
-			fmt.Printf("%x\n", byte(len(name[j])))
 			buf.WriteByte(byte(len(name[j])))
 			buf.Write([]byte(name[j]))
 		}
 		buf.WriteByte(byte(0))
 	}
-	fmt.Println(sufpos)
 	return nil
 }

@@ -1,3 +1,4 @@
 *.log
 go.mod
 go.sum
+*.exe
