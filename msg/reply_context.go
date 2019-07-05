@@ -26,7 +26,15 @@ func NewReplyContext(dnm *DNSMessage) (rc *ReplyContext) {
 	}
 }
 
-func (ctx *ReplyContext) CompressName(bytename []byte) ([]byte, error) {
+// 3ebd00b184dbb2acd4b21f1c0800450000dd5a6600007f110b47c0a82a09c0a82a090035ce6900c9c406
+
+// 0002818000010002000100010763617074636861056774696d6703636f6d00001c0001
+// adde818000010002000100010763617074636861056774696d6703636f6d00001c0001
+// Name c00c 0005 0001 0000012c 0020 0763617074636861056774696d6703636f6d05636c6f7564027463027171c01ac02f00050001000000bb000b03703231047463646ec04ac05f0006000100000108002a076e732d63646e31c04a097765626d6173746572c04a4fd6eede0000012c00000258000151800000012c000029100000000000001c000a0018d13548243231cf727ee4e34e5d1f2fdfdc2ddf657e74aa90
+// Name c00c 0005 0001 0000012c 0100 0763617074636861056774696d6703636f6d05636c6f7564027463027171c01a00050001000000bb0100047463646ec04a0006000100000108002a076e732d63646e31c04a097765626d6173746572c04a4fd6eede0000012c00000258000151800000012c000029100000000000001c000a0018d13548243231cf727ee4e34e5d1f2fdfdc2ddf657e74aa90
+// 7f36818000010002000100010763617074636861056774696d6703636f6d00001c0001
+//      c00c 0005 0001 0000004f 200763617074636861056774696d6703636f6d05636c6f7564027463027171c01ac02d00050001000002050b03703231047463646ec048c05c00060001000000e4002a076e732d63646e31c04a097765626d6173746572c04a4fd6eede0000012c00000258000151800000012c000029100000000000001c000a001836c54af6acd2d76dc5ae10fb5d1f35f3d31783c8bed4d8a4
+func (ctx *ReplyContext) CompressName(bytename []byte, reserveSpace int) ([]byte, error) {
 	name := strings.Split(string(bytename), ".")
 	var (
 		buf    = new(bytes.Buffer)
@@ -46,7 +54,7 @@ func (ctx *ReplyContext) CompressName(bytename []byte) ([]byte, error) {
 
 	suffix = name[len(name)-1]
 	offset = ctx.Buf.Len()
-	prelen = len(bytename)
+	prelen = len(bytename) + reserveSpace
 	for j := len(name) - 1; j >= 0; j-- {
 		if j == len(name)-1 {
 			suffix = name[j]
@@ -93,7 +101,7 @@ func (ctx *ReplyContext) CompressName(bytename []byte) ([]byte, error) {
 }
 
 func (ctx *ReplyContext) InsertName(b []byte) (err error) {
-	if b, err = ctx.CompressName(b); err != nil {
+	if b, err = ctx.CompressName(b, 0); err != nil {
 		return
 	}
 	fmt.Println("getting name", b)
@@ -102,11 +110,11 @@ func (ctx *ReplyContext) InsertName(b []byte) (err error) {
 }
 
 func (ctx *ReplyContext) InsertNameWithLength(b []byte) (err error) {
-	if b, err = ctx.CompressName(b); err != nil {
+	if b, err = ctx.CompressName(b, 2); err != nil {
 		return
 	}
-	fmt.Println("getting compressing name", byte(len(b)), b)
-	ctx.Buf.Write(byte(len(b)))
+	fmt.Println("getting compressing name", uint16(len(b)), b)
+	ctx.Buf.Write(uint16(len(b)))
 	ctx.Buf.Write(b)
 	return
 }
@@ -149,6 +157,7 @@ func (ctx *ReplyContext) InsertAnswer(a DNSAnswer) (err error) {
 	// TODO: Test a.Type
 
 	if a.Type == rtype.CNAME {
+		fmt.Println("compressing cname", string(a.RDData))
 		if err = ctx.InsertNameWithLength(a.RDData); err != nil {
 			return
 		}

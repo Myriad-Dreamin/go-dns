@@ -56,6 +56,8 @@ import (
 	"math/rand"
 	"strconv"
 	"time"
+
+	rtype "github.com/Myriad-Dreamin/go-dns/msg/rec/rtype"
 )
 
 type DNSAnswer struct {
@@ -104,6 +106,12 @@ func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
 	a.RDData, err = ReadnBytes(buffer, int(a.RDLength))
 	if err != nil {
 		return 0, err
+	}
+	if a.Type == rtype.CNAME {
+		a.RDData, l, err = GetStringFullName(bs, offset+cnt)
+		if err != nil {
+			return 0, err
+		}
 	}
 	cnt += int(a.RDLength)
 	return cnt, nil
