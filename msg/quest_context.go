@@ -5,24 +5,6 @@ type QuestContext struct {
 	additionSize uint16
 }
 
-func NewDNSMessageQuestContextQuery(msgid uint16, que []DNSQuestion) (n int, m *DNSMessage) {
-	c := new(QuestContext)
-	c.Message.InitQuery(msgid)
-	c.additionSize = c.Message.Header.Size()
-	n = c.PacketQuestion(que)
-	m = &c.Message
-	return
-}
-
-func NewDNSMessageQuestContextRecursivelyQuery(msgid uint16, que []DNSQuestion) (n int, m *DNSMessage) {
-	c := new(QuestContext)
-	c.Message.InitRecursivelyQuery(msgid)
-	c.additionSize = c.Message.Header.Size()
-	n = c.PacketQuestion(que)
-	m = &c.Message
-	return
-}
-
 func (m *QuestContext) PacketQuestion(question []DNSQuestion) int {
 	for i, q := range question {
 		if !m.InsertQuestion(q) {

@@ -20,4 +20,6 @@ const (
 	MINFO
 	MX
 	TXT
+
+	OPT Type = 41
 )

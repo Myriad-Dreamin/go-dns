@@ -1,7 +1,6 @@
 package dnssrv
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"net"
@@ -254,7 +253,7 @@ func (srv *Server) ServeUDPFromOut(tid uint16, b []byte) {
 	srv.logger.Infof("new message incoming: id, address: %v, %v", message.Header.ID, servingAddr)
 	fid := message.Header.ID
 	message.Header.ID = tid
-	b, err = message.ToBytes()
+	b, err = message.CompressToBytes()
 	// b[0] = byte(tid >> 8)
 	// b[1] = byte(tid & 0xff)
 	if err != nil {
@@ -276,8 +275,7 @@ func (srv *Server) ServeUDPFromOut(tid uint16, b []byte) {
 		srv.logger.Errorf("not matching..., serving %v", servingAddr)
 	}
 	message.Header.ID = fid
-	b, err = message.ToBytes()
-	fmt.Println(hex.EncodeToString(b))
+	b, err = message.CompressToBytes()
 
 	// b[0] = byte(fid >> 8)
 	// b[1] = byte(fid & 0xff)
