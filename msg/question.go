@@ -120,7 +120,7 @@ func (q *DNSQuestion) SName() string {
 }
 
 func (q *DNSQuestion) SType() (string, error) {
-	stype, suc := typename[q.Type]
+	stype, suc := Typename[q.Type]
 	if suc != true {
 		return "", errors.New("No such RR type")
 	}

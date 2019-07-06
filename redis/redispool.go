@@ -15,11 +15,11 @@ var (
 )
 
 func init() {
-	pool = newPool("127.0.0.1:6379", "")
+	pool = NewPool("127.0.0.1:6379", "")
 	RedisCacheClient = &RedisCache{pool: pool}
 }
 
-func newPool(server string, password string) *redis.Pool {
+func NewPool(server string, password string) *redis.Pool {
 	return &redis.Pool{
 		MaxIdle:     3,
 		MaxActive:   1024,

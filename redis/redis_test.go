@@ -83,27 +83,31 @@ func TestRedis(t *testing.T) {
 		fmt.Println("redis set failed:", err)
 	}
 
-	if err = PushToRedis(msgMessage.Answer, conn); err != nil {
+	if _, err = AnswersToRedis(msgMessage.Answer, conn); err != nil {
 		fmt.Println(err)
 		return
 	}
-	if err = PushToRedis(msgMessage.Authority, conn); err != nil {
+	if _, err = AnswersToRedis(msgMessage.Authority, conn); err != nil {
 		fmt.Println(err)
 		return
 	}
-	if err = PushToRedis(msgMessage.Additional, conn); err != nil {
+	if _, err = AnswersToRedis(msgMessage.Additional, conn); err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	searchkey, err := msgMessage.Question[0].RedisKey()
+	// searchkey, err := msgMessage.Question[0].RedisKey()
+	_, err = msgMessage.Question[0].RedisKey()
 
 	// fmt.Println(searchkey)
 
 	// keys, err := redis.Strings(conn.Do("keys", searchkey+":*"))
-	conn.Send("keys", searchkey+":*")
+	// conn.Send("keys", searchkey+":*")
+	conn.Send("keys", "test")
 	conn.Flush()
 	keys, err := redis.Strings(conn.Receive())
+
+	fmt.Println("keys len: ", len(keys))
 
 	if err != nil {
 		fmt.Println(err)

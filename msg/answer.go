@@ -2,7 +2,9 @@ package msg
 
 import (
 	"bytes"
+	"crypto/md5"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -93,7 +95,26 @@ func (a DNSAnswer) Size() uint16 {
 	default:
 		panic("???? RDData Must...")
 	}
+}
 
+func (a *DNSAnswer) SetTTL(ttl uint32) bool { // big/little endian problem
+	a.TTL = ttl
+	return true
+}
+
+func (a *DNSAnswer) ToFormalSOA() error {
+	var err error
+	sa := a.RDData.(*SOA)
+	sa.PrimaryNS, err = ToDNSDomainName(sa.PrimaryNS)
+	if err != nil {
+		return err
+	}
+	sa.MailTo, err = ToDNSDomainName(sa.MailTo)
+	if err != nil {
+		return err
+	}
+	a.RDLength = uint16(len(sa.PrimaryNS) + len(sa.MailTo) + 20)
+	return nil
 }
 
 func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
@@ -165,6 +186,9 @@ func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
 		rw.Read(&rdata.RetryInterval)
 		rw.Read(&rdata.ExpireLimit)
 		rw.Read(&rdata.MinimumTTL)
+
+		// a.RDLength = uint16(l2 + l3 + 20)
+		a.RDLength = uint16(len(rdata.PrimaryNS) + len(rdata.MailTo) + 20)
 		a.RDData = rdata
 	case rtype.A, rtype.AAAA:
 		fallthrough
@@ -247,12 +271,23 @@ func (a *DNSAnswer) ToBytes() ([]byte, error) {
 	buf.Write(a.Class)
 	buf.Write(a.TTL)
 	buf.Write(a.RDLength)
-	buf.Write(a.RDData)
+	switch a.Type {
+	case rtype.SOA:
+		buf.Write(a.RDData.(*SOA).PrimaryNS)
+		buf.Write(a.RDData.(*SOA).MailTo)
+		buf.Write(a.RDData.(*SOA).SerialNumber)
+		buf.Write(a.RDData.(*SOA).RefreshInterval)
+		buf.Write(a.RDData.(*SOA).RetryInterval)
+		buf.Write(a.RDData.(*SOA).ExpireLimit)
+		buf.Write(a.RDData.(*SOA).MinimumTTL)
+	default:
+		buf.Write(a.RDData)
+	}
 	return buf.Bytes(), nil
 }
 
 func (a *DNSAnswer) SType() (string, error) {
-	stype, suc := typename[a.Type]
+	stype, suc := Typename[a.Type]
 	if suc != true {
 		return "", errors.New("No such RR type")
 	}
@@ -280,4 +315,43 @@ func (a *DNSAnswer) RedisRandomKey() (string, error) {
 		return "", err
 	}
 	return rkey + ":" + strconv.Itoa(int(hash)), nil
+}
+
+func (a *DNSAnswer) RedisHashKey() (string, error) {
+	var bs []byte
+	hash := md5.New()
+	rw := mdnet.NewIO()
+	rw.Write(a.Name)
+	rw.Write(a.Type)
+	rw.Write(a.RDData)
+	bs = rw.Bytes()
+	if _, err := hash.Write(bs); err != nil {
+		return "", err
+	}
+	rkey, err := a.RedisKey()
+	if err != nil {
+		return "", err
+	}
+	return rkey + ":" + hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func (a *DNSAnswer) RedisAuthorityHashKey(qt uint16) (string, error) {
+	var bs []byte
+	var rkey string
+	hash := md5.New()
+	rw := mdnet.NewIO()
+	rw.Write(a.Name)
+	rw.Write(qt)
+	rw.Write(a.Type)
+	rw.Write(a.RDData)
+	bs = rw.Bytes()
+	if _, err := hash.Write(bs); err != nil {
+		return "", err
+	}
+	rkey, err := a.RedisKey()
+	if err != nil {
+		return "", err
+	}
+	rkey += ":" + Typename[qt]
+	return rkey + ":" + hex.EncodeToString(hash.Sum(nil)), nil
 }

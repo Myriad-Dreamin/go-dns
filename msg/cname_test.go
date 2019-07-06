@@ -34,13 +34,13 @@ func TestCNAME(t *testing.T) {
 
 	for {
 
-		// bs, err := msgMessage.CompressToBytes()
-		// if err != nil {
-		// 	fmt.Println("Error: ", err)
-		// }
-		// _, err = conn.Write(bs)
+		bs, err := msgMessage.CompressToBytes()
+		if err != nil {
+			fmt.Println("Error: ", err)
+		}
+		_, err = conn.Write(bs)
 
-		bs, err := msgMessage.ToBytes()
+		bs, err = msgMessage.ToBytes()
 		if err != nil {
 			fmt.Println("Error: ", err)
 		}

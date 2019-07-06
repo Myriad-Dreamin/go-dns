@@ -9,6 +9,8 @@ import (
 	mdnet "github.com/Myriad-Dreamin/go-dns/net"
 )
 
+//TODO check additon size of reply
+
 type ReplyContext struct {
 	Buf       *mdnet.IO
 	SuffixMap map[string]int

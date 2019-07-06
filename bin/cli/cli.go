@@ -132,6 +132,8 @@ func (srv *ServerX) Run() {
 			srv.SetRootLogger(os.Stdout)
 		}
 		srv.logger.Fatal(err)
+	} else {
+		fmt.Println(err)
 	}
 }
 
