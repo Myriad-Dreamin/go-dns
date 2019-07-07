@@ -12,27 +12,31 @@ import (
 )
 
 func AnswersToRedis(answers []msg.DNSAnswer, conn redis.Conn) (int, error) {
-	var cnt int
+	var (
+		cnt int
+		key string
+		err error
+	)
 	for _, ans := range answers {
 		// key, err := ans.RedisRandomKey()
-		key, err := ans.RedisHashKey()
+		//b := ans.RDData
+		// conn.Do("set", key, b, "EX", ans.TTL)
+		key, err = ans.RedisHashKey()
+		switch ans.Type {
+		case rtype.A, rtype.NS, rtype.CNAME, rtype.AAAA, rtype.MX:
+			key, err = ans.RedisHashKey()
+		default:
+			return 0, errors.New("Type it not suppoted")
+		}
 		if err != nil {
 			return 0, err
 		}
-		//b := ans.RDData
 		b, err := ans.ToBytes()
 		if err != nil {
 			return 0, err
 		}
-		// conn.Do("set", key, b, "EX", ans.TTL)
-		switch ans.Type {
-		case rtype.A, rtype.NS, rtype.CNAME, rtype.AAAA:
-			conn.Send("set", key, b, "EX", ans.TTL)
-			cnt += 1
-		default:
-			return 0, errors.New("Type it not suppoted by redis")
-		}
-
+		conn.Send("set", key, b, "EX", ans.TTL)
+		cnt += 1
 	}
 	return cnt, nil
 }
@@ -44,7 +48,6 @@ func AuthorityToRedis(que msg.DNSQuestion, answers []msg.DNSAnswer, conn redis.C
 		if err != nil {
 			return 0, err
 		}
-		ans.ToFormalSOA()
 		b, err := ans.ToBytes()
 		if err != nil {
 			return 0, err
@@ -121,20 +124,18 @@ func HasRecord(keys []string, prefix string) int {
 func FindCache(m *msg.DNSMessage, conn redis.Conn) bool {
 	var (
 		replyans msg.DNSAnswer
+		keys     []string
+		err      error
 	)
 	for _, que := range m.Question {
 		domain := string(que.Name)
-		searchkey, err := que.RedisKey()
+		searchkey := domain + ":" + msg.Typename[que.Type]
 		if err != nil {
 			return false
 		}
 		switch que.Type {
-		case qtype.A, qtype.AAAA:
-			keys, err := redis.Strings(conn.Do("keys", searchkey+":*"))
-			if err != nil {
-				return false
-			}
-			if len(keys) == 0 { // Find CNAME
+		case qtype.A, qtype.AAAA, qtype.MX:
+			for { // Find CNAME
 				keys, err = redis.Strings(conn.Do("keys", domain+":CNAME:*"))
 				if len(keys) > 1 {
 					fmt.Print("Multiple CNAME error")
@@ -147,31 +148,33 @@ func FindCache(m *msg.DNSMessage, conn redis.Conn) bool {
 					}
 					replyans.ReadFrom(bs, 0)
 					m.InsertAnswer(replyans)
-					searchkey, err = replyans.RedisKey()
-					if err != nil {
-						return false
-					}
-					keys, err = redis.Strings(conn.Do("keys", string(replyans.Name)+":CNAME"))
-					if err != nil {
-						return false
-					}
+					// searchkey, err = replyans.RedisKey()
+					domain = string(replyans.RDData.([]byte))
+					searchkey = domain + ":" + msg.Typename[que.Type]
+				} else {
+					break
 				}
 			}
+			keys, err = redis.Strings(conn.Do("keys", searchkey+":*"))
+			if err != nil {
+				return false
+			}
 			if len(keys) == 0 { // Find SOA
-				keys, err = redis.Strings(conn.Do("keys", domain+":SOA:"+msg.Typename[que.Type]+"*"))
+				keys, err = redis.Strings(conn.Do("keys", domain+":SOA:"+msg.Typename[que.Type]+":*"))
 				if len(keys) == 0 {
 					return false
 				} else {
-					return AddAuthority(m, keys, conn)
+					return InsertAuthority(m, keys, conn)
 				}
+			} else {
+				return InsertAnswer(m, keys, conn)
 			}
-			return AddAnswer(m, keys, conn)
 		case qtype.NS, qtype.CNAME:
 			keys, err := redis.Strings(conn.Do("keys", searchkey+":*"))
 			if err != nil {
 				return false
 			}
-			return AddAnswer(m, keys, conn)
+			return InsertAnswer(m, keys, conn)
 		default:
 			return false
 		}
@@ -179,7 +182,7 @@ func FindCache(m *msg.DNSMessage, conn redis.Conn) bool {
 	return true
 }
 
-func AddAnswer(m *msg.DNSMessage, keys []string, conn redis.Conn) bool {
+func InsertAnswer(m *msg.DNSMessage, keys []string, conn redis.Conn) bool {
 	if len(keys) == 0 {
 		return false
 	}
@@ -202,7 +205,7 @@ func AddAnswer(m *msg.DNSMessage, keys []string, conn redis.Conn) bool {
 	return true
 }
 
-func AddAuthority(m *msg.DNSMessage, keys []string, conn redis.Conn) bool {
+func InsertAuthority(m *msg.DNSMessage, keys []string, conn redis.Conn) bool {
 	if len(keys) == 0 {
 		return false
 	}

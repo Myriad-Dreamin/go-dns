@@ -8,7 +8,7 @@ import (
 
 	msg "github.com/Myriad-Dreamin/go-dns/msg"
 	mredis "github.com/Myriad-Dreamin/go-dns/redis"
-	"github.com/garyburd/redigo/redis"
+	// "github.com/garyburd/redigo/redis"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -258,9 +258,7 @@ func (srv *Server) ServeUDPFromOut(tid uint16, b []byte) {
 	}
 	srv.logger.Infof("new message incoming: id, address: %v, %v", message.Header.ID, servingAddr)
 
-	// rc.pool = redis.NewPool("127.0.0.1:6379", "")
-	conn, err := redis.Dial("tcp", "127.0.0.1:6379")
-	// conn := rc.pool.Get()
+	conn := mredis.RedisCacheClient.Pool.Get()
 	defer conn.Close()
 
 	reply := msg.NewDNSMessageReply(message.Header.ID, message.Header.Flags, message.Question)

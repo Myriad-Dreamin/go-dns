@@ -82,8 +82,17 @@ type SOA struct {
 	MinimumTTL      uint32
 }
 
+type MX struct {
+	Preference   uint16
+	MailExchange []byte
+}
+
 func (soa *SOA) Len() int {
 	return len(soa.PrimaryNS) + len(soa.MailTo) + 10
+}
+
+func (mx *MX) Len() int {
+	return len(mx.MailExchange) + 2
 }
 
 func (a DNSAnswer) Size() uint16 {
@@ -100,21 +109,6 @@ func (a DNSAnswer) Size() uint16 {
 func (a *DNSAnswer) SetTTL(ttl uint32) bool { // big/little endian problem
 	a.TTL = ttl
 	return true
-}
-
-func (a *DNSAnswer) ToFormalSOA() error {
-	var err error
-	sa := a.RDData.(*SOA)
-	sa.PrimaryNS, err = ToDNSDomainName(sa.PrimaryNS)
-	if err != nil {
-		return err
-	}
-	sa.MailTo, err = ToDNSDomainName(sa.MailTo)
-	if err != nil {
-		return err
-	}
-	a.RDLength = uint16(len(sa.PrimaryNS) + len(sa.MailTo) + 20)
-	return nil
 }
 
 func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
@@ -160,18 +154,18 @@ func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
 
 	switch a.Type {
 	case rtype.NS, rtype.CNAME:
-		a.RDData, _, err = GetStringFullName(bs, offset+cnt)
+		a.RDData, _, err = GetFullName(bs, offset+cnt)
 		if err != nil {
 			return 0, err
 		}
 	case rtype.SOA:
 		var l2, l3 int
 		rdata := new(SOA)
-		rdata.PrimaryNS, l, err = GetStringFullName(bs, offset+cnt)
+		rdata.PrimaryNS, l, err = GetFullName(bs, offset+cnt)
 		if err != nil {
 			return 0, err
 		}
-		rdata.MailTo, l2, err = GetStringFullName(bs, offset+cnt+l)
+		rdata.MailTo, l2, err = GetFullName(bs, offset+cnt+l)
 		if err != nil {
 			return 0, err
 		}
@@ -186,9 +180,19 @@ func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
 		rw.Read(&rdata.RetryInterval)
 		rw.Read(&rdata.ExpireLimit)
 		rw.Read(&rdata.MinimumTTL)
-
 		// a.RDLength = uint16(l2 + l3 + 20)
 		a.RDLength = uint16(len(rdata.PrimaryNS) + len(rdata.MailTo) + 20)
+		a.RDData = rdata
+	case rtype.MX:
+		rw := mdnet.NewIO()
+		rdata := new(MX)
+		rw.Write(bs[offset+cnt : offset+cnt+2])
+		rw.Read(&rdata.Preference)
+		rdata.MailExchange, _, err = GetFullName(bs, offset+cnt+2)
+		if err != nil {
+			return 0, err
+		}
+		a.RDLength = uint16(len(rdata.MailExchange) + 2)
 		a.RDData = rdata
 	case rtype.A, rtype.AAAA:
 		fallthrough
@@ -199,8 +203,6 @@ func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
 		}
 		// return 0, errors.New("Resource type not supported")
 	}
-
-	// a.Data
 	cnt += int(a.RDLength)
 	return cnt, nil
 }
@@ -280,8 +282,11 @@ func (a *DNSAnswer) ToBytes() ([]byte, error) {
 		buf.Write(a.RDData.(*SOA).RetryInterval)
 		buf.Write(a.RDData.(*SOA).ExpireLimit)
 		buf.Write(a.RDData.(*SOA).MinimumTTL)
+	case rtype.MX:
+		buf.Write(a.RDData.(*MX).Preference)
+		buf.Write(a.RDData.(*MX).MailExchange)
 	default:
-		buf.Write(a.RDData)
+		buf.Write(a.RDData.([]byte))
 	}
 	return buf.Bytes(), nil
 }

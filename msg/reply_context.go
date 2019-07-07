@@ -3,10 +3,10 @@ package msg
 import (
 	"bytes"
 	"errors"
-	"strings"
-
+	// "fmt"
 	rtype "github.com/Myriad-Dreamin/go-dns/msg/rec/rtype"
 	mdnet "github.com/Myriad-Dreamin/go-dns/net"
+	"strings"
 )
 
 //TODO check additon size of reply
@@ -120,13 +120,28 @@ func (ctx *ReplyContext) InsertNameWithLength(b []byte) (err error) {
 	return
 }
 
+func (ctx *ReplyContext) InsertDomainDataWithLength(b []byte) (err error) {
+	if b, _, err = GetStringFullName(b, 0); err != nil {
+		return
+	}
+	if b, err = ctx.CompressName(b, 2); err != nil {
+		return
+	}
+	// fmt.Println("getting compressing name", uint16(len(b)), b)
+	ctx.Buf.Write(uint16(len(b)))
+	ctx.Buf.Write(b)
+	return
+}
+
 func (ctx *ReplyContext) InsertSOA(soa *SOA) (err error) {
 	var b2, b3 []byte
-	if b2, err = ctx.CompressName(soa.PrimaryNS, 2); err != nil {
+	sn, _, err := GetStringFullName(soa.PrimaryNS, 0)
+	if b2, err = ctx.CompressName(sn, 2); err != nil {
 		return
 	}
 
-	if b3, err = ctx.CompressName(soa.MailTo, 2+len(b2)); err != nil {
+	sn, _, err = GetStringFullName(soa.MailTo, 0)
+	if b3, err = ctx.CompressName(sn, 2+len(b2)); err != nil {
 		return
 	}
 
@@ -138,6 +153,18 @@ func (ctx *ReplyContext) InsertSOA(soa *SOA) (err error) {
 	ctx.Buf.Write(soa.RetryInterval)
 	ctx.Buf.Write(soa.ExpireLimit)
 	ctx.Buf.Write(soa.MinimumTTL)
+	return
+}
+
+func (ctx *ReplyContext) InsertMX(mx *MX) (err error) {
+	var b []byte
+	sn, _, err := GetStringFullName(mx.MailExchange, 0)
+	if b, err = ctx.CompressName(sn, 4); err != nil {
+		return
+	}
+	ctx.Buf.Write(uint16(2 + len(b)))
+	ctx.Buf.Write(mx.Preference)
+	ctx.Buf.Write(b)
 	return
 }
 
@@ -180,11 +207,15 @@ func (ctx *ReplyContext) InsertAnswer(a DNSAnswer) (err error) {
 
 	switch a.Type {
 	case rtype.CNAME, rtype.NS:
-		if err = ctx.InsertNameWithLength(a.RDData.([]byte)); err != nil {
+		if err = ctx.InsertDomainDataWithLength(a.RDData.([]byte)); err != nil {
 			return
 		}
 	case rtype.SOA:
 		if err = ctx.InsertSOA(a.RDData.(*SOA)); err != nil {
+			return
+		}
+	case rtype.MX:
+		if err = ctx.InsertMX(a.RDData.(*MX)); err != nil {
 			return
 		}
 	default:
