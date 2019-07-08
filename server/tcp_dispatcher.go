@@ -3,7 +3,10 @@ package dnssrv
 import (
 	"bytes"
 	"net"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -46,6 +49,7 @@ func (ss *sharedSpace) SetDispatcher(td *TCPDispatcher) {
 
 type TCPDispatcher struct {
 	*sharedSpace
+	messageChan            chan *bytes.Buffer
 	connTCP                *net.TCPListener
 	tcpRemoteServerRoutine []*TCPRemoteServerRoutine
 	tcpUserRoutine         []*TCPUserRoutine
@@ -72,6 +76,7 @@ func NewTCPDispatcher(
 		tidL:                   idRangeL,
 		tidR:                   idRangeR,
 		tcpRange:               tcpRange,
+		messageChan:            make(chan *bytes.Buffer),
 		tcpUserRoutine:         make([]*TCPUserRoutine, tcpRange, tcpRange),
 		tcpRemoteServerRoutine: make([]*TCPRemoteServerRoutine, tcpRange, tcpRange),
 	}
@@ -106,18 +111,58 @@ func (d *TCPDispatcher) Prepare(network string, host *net.TCPAddr) error {
 	return d.listenTCP()
 }
 
-func (d *TCPDispatcher) Start(qc chan bool) (err error) {
-	qc <- true
-	return
+func (d *TCPDispatcher) Start(qc *chan bool) (err error) {
+	osQuitSignalChan := make(chan os.Signal)
+	signal.Notify(osQuitSignalChan, os.Kill, syscall.SIGHUP, syscall.SIGINT, syscall.SIGQUIT,
+		syscall.SIGKILL, syscall.SIGILL, syscall.SIGTERM,
+	)
+	for i := uint16(0); i < d.tcpRange; i++ {
+		go d.tcpRemoteServerRoutine[i].Run()
+		go d.tcpUserRoutine[i].Run()
+	}
+	for {
+		select {
+		// case idx := <-srv.TCPRoutineLimit:
+		// 	go srv.ServeTCPFromOut(idx, srv.TCPBuffer[idx-UDPRange])
+		// case idx := <-srv.TCPWriteRoutineLimit:
+		// 	go srv.ServeTCPWriteToOut(idx)
+		// case idx := <-srv.TCPReadRoutineLimit:
+		// 	go srv.ServeTCPReadFromOut(idx, srv.TCPReadBuffer[idx-UDPRange])
+		}
+	}
+}
+
+func (d *TCPDispatcher) AtExit() {
+	if err := d.Stop(); err != nil {
+		d.logger.Errorf("error occurred when stopping tcp dispatcher, error: %v", err)
+	}
+	d.logger.Infof("tcp server stop successfully")
 }
 
 func (d *TCPDispatcher) Stop() error {
+	var reqs = 0
 	for i := uint16(0); i < d.tcpRange; i++ {
-		d.tcpRemoteServerRoutine[i].QuitRequest <- true
-		d.tcpUserRoutine[i].QuitRequest <- true
+		if d.tcpRemoteServerRoutine[i].RequestQuit() {
+			reqs++
+		}
+		if d.tcpUserRoutine[i].RequestQuit() {
+			reqs++
+		}
 	}
-	for i := int32(d.tcpRange) * 2; i > 0; i-- {
+	for i := reqs; i > 0; i-- {
 		<-d.quit
 	}
 	return d.connTCP.Close()
 }
+
+// func (srv *Server) ReleaseTCPRoutine(tid uint16) {
+// 	srv.TCPRoutineLimit <- tid
+// }
+//
+// func (srv *Server) ReleaseTCPReadRoutine(tid uint16) {
+// 	srv.TCPReadRoutineLimit <- tid
+// }
+//
+// func (srv *Server) ReleaseTCPWriteRoutine(tid uint16) {
+// 	srv.TCPWriteRoutineLimit <- tid
+// }

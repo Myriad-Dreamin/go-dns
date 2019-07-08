@@ -43,9 +43,9 @@ func (srv *Client) tryDisonnectFromRemoteDNSServer() error {
 }
 
 func (srv *Client) MTestLookUpA(tid uint16, req string) (ret string, err error) {
-	fmt.Println("+")
+	//fmt.Println("+")
 	defer func() {
-		fmt.Println("-")
+		//fmt.Println("-")
 		srv.WG.Done()
 	}()
 	requestNames := [][]byte{[]byte(req)}
@@ -57,33 +57,33 @@ func (srv *Client) MTestLookUpA(tid uint16, req string) (ret string, err error) 
 	)
 
 	for len(request) != 0 {
-		n, s := msg.NewDNSMessageContextRecursivelyQuery(tid, request)
+		n, s := msg.NewDNSMessageRecursivelyQuery(tid, request)
 		request = request[n:]
 
 		// fmt.Println(n, s)
 		b, err := s.ToBytes()
 		if err != nil {
-			fmt.Printf("convert request message error: %v", err)
+			//fmt.Printf("convert request message error: %v", err)
 			return "", err
 		}
 
 		if _, err := srv.remoteConn.Write(b); err != nil {
-			fmt.Printf("write error: %v", err)
+			//fmt.Printf("write error: %v", err)
 			return "", err
 		}
 
 		b = make([]byte, 1024)
-		srv.remoteConn.SetDeadline(time.Now().Add(time.Millisecond * 1000))
+		srv.remoteConn.SetDeadline(time.Now().Add(time.Millisecond * 5000))
 		n, err = srv.remoteConn.Read(b)
 		if err != nil {
-			fmt.Printf("read error: %v", err)
+			//fmt.Printf("read error: %v", err)
 			return "", err
 		}
 
 		var rmsg = new(msg.DNSMessage)
 		n, err = rmsg.Read(b)
 		if err != nil {
-			fmt.Printf("convert read message error: %v", err)
+			//fmt.Printf("convert read message error: %v", err)
 			return "", err
 		}
 		// fmt.Println(n, err)
@@ -111,14 +111,28 @@ func BenchmarkTestA(b *testing.B) {
 	}()
 	b.ResetTimer()
 	ff := uint16(1)
-	b.N = 1000
+	b.N = 4000
+	var bx = make(chan bool, 4000)
 	for i := 0; i < b.N; i++ {
 		c.WG.Add(1)
 		go func() {
 			ff++
-			c.MTestLookUpA(ff, "www.baidu.com")
-
+			_, err := c.MTestLookUpA(ff, "www.baidu.com")
+			if err != nil {
+				bx <- false
+			} else {
+				bx <- true
+			}
 		}()
 	}
+	var erro, suco = 0, 0
+	for i := 0; i < b.N; i++ {
+		if <-bx {
+			suco++
+		} else {
+			erro++
+		}
+	}
+	fmt.Println(erro, suco)
 	c.WG.Wait()
 }

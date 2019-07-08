@@ -3,7 +3,10 @@ package dnssrv
 import (
 	"errors"
 	"net"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	// "github.com/garyburd/redigo/redis"
@@ -12,9 +15,9 @@ import (
 )
 
 const (
-	UDPRange      = uint16(200)
+	UDPRange      = uint16(1000)
 	UDPBufferSize = 520
-	TCPRange      = uint16(50)
+	TCPRange      = uint16(5)
 	TCPBufferSize = 65000
 	TCPTimeout    = 10 * time.Second
 	// serverAddr    = "0.0.0.0:53"
@@ -28,18 +31,48 @@ type Server struct {
 	// stateless udp managed by udp dispatcher
 	// UDPDispatcher
 	UDPDispatcher *UDPDispatcher
+	SetUpUDP      chan bool
+	QuitUDP       chan bool
 
 	// stateful tcp managed by tcp dispatcher
 	// TCPDispatcher
 	TCPDispatcher *TCPDispatcher
+	QuitTCP       chan bool
+	SetUpTCP      chan bool
 
-	Quit chan bool
+	quit chan bool
 }
 
 func (srv *Server) SetLogger(mLogger *log.Logger) {
 	srv.logger = mLogger.WithFields(log.Fields{
 		"prog": "server",
 	})
+}
+
+type handler struct {
+	logger *log.Entry
+	funcs  []func()
+}
+
+func (h *handler) register(atexit func()) {
+	h.funcs = append(h.funcs, atexit)
+}
+
+func (h *handler) atExit() {
+	osQuitSignalChan := make(chan os.Signal)
+	signal.Notify(osQuitSignalChan, os.Kill, syscall.SIGHUP, syscall.SIGINT, syscall.SIGQUIT,
+		syscall.SIGKILL, syscall.SIGILL, syscall.SIGTERM,
+	)
+	for {
+		select {
+		case osc := <-osQuitSignalChan:
+			h.logger.Infoln("handlering", osc)
+			for _, f := range h.funcs {
+				f()
+			}
+			return
+		}
+	}
 }
 
 func (srv *Server) ListenAndServe(host string) (err error) {
@@ -50,38 +83,71 @@ func (srv *Server) ListenAndServe(host string) (err error) {
 		return
 	}
 
-	err = srv.setupUDPDispatcher()
-	if err != nil {
-		return
+	srv.QuitTCP = make(chan bool, 1)
+	srv.QuitUDP = make(chan bool, 1)
+	srv.SetUpTCP = make(chan bool, 1)
+	srv.SetUpUDP = make(chan bool, 1)
+	srv.quit = make(chan bool, 1)
+	go func() {
+
+		err = srv.setupUDPDispatcher()
+		if err != nil {
+			srv.SetUpUDP <- false
+			return
+		}
+
+		err = srv.PrepareUDPDispatcher(host)
+		if err != nil {
+			srv.SetUpUDP <- false
+			return
+		}
+
+		srv.logger.Infof("all is ready for start udp server at %v", host)
+		srv.SetUpUDP <- true
+		srv.UDPDispatcher.Start(&srv.QuitUDP)
+	}()
+
+	go func() {
+		err = srv.setupTCPDispatcher()
+		if err != nil {
+			srv.SetUpTCP <- false
+			return
+		}
+
+		err = srv.prepareTCPDispatcher(host)
+		if err != nil {
+			srv.SetUpTCP <- false
+			return
+		}
+
+		srv.logger.Infof("all is ready for start tcp server at %v", host)
+		srv.SetUpTCP <- true
+		go srv.TCPDispatcher.Start(&srv.QuitTCP)
+	}()
+	var mh = handler{srv.logger, nil}
+	go mh.atExit()
+
+	wait := 2
+	for wait > 0 {
+		select {
+		case qwq := <-srv.SetUpTCP:
+			if qwq {
+				mh.register(srv.TCPDispatcher.AtExit)
+			}
+			wait--
+		case qwq := <-srv.SetUpUDP:
+			if qwq {
+				mh.register(srv.UDPDispatcher.AtExit)
+			}
+			wait--
+		}
 	}
-
-	err = srv.setupTCPDispatcher()
-	if err != nil {
-		return
-	}
-
-	srv.Quit = make(chan bool, 2)
-
-	err = srv.PrepareUDPDispatcher(host)
-	if err != nil {
-		return
-	}
-
-	err = srv.prepareTCPDispatcher(host)
-	if err != nil {
-		return
-	}
-
-	go srv.UDPDispatcher.Start(srv.Quit)
-	go srv.TCPDispatcher.Start(srv.Quit)
-
-	<-srv.Quit
-	<-srv.Quit
-
+	mh.register(func() { srv.quit <- true })
 	// close
-	_ = srv.UDPDispatcher.Stop()
-	_ = srv.TCPDispatcher.Stop()
-	return
+	select {
+	case <-srv.quit:
+		return
+	}
 }
 
 func (srv *Server) setupTCPDispatcher() error {
@@ -141,132 +207,3 @@ func (srv *Server) PrepareUDPDispatcher(host string) (err error) {
 	}
 	return srv.UDPDispatcher.Prepare(network, addr)
 }
-
-// func (srv *Server) ReleaseTCPRoutine(tid uint16) {
-// 	srv.TCPRoutineLimit <- tid
-// }
-//
-// func (srv *Server) ReleaseTCPReadRoutine(tid uint16) {
-// 	srv.TCPReadRoutineLimit <- tid
-// }
-//
-// func (srv *Server) ReleaseTCPWriteRoutine(tid uint16) {
-// 	srv.TCPWriteRoutineLimit <- tid
-// }
-
-// func (srv *Server) ServeTCPReadFromOut(tid uint16, b []byte) {
-// 	_, err := srv.remoteTCPConn[tid-UDPRange].Read(b)
-// 	if err != nil {
-// 		srv.logger.Errorf("read error: %v", err)
-// 		return
-// 	}
-//
-// 	// fast extract id from message
-// 	f := (uint16(b[0]) << 8) + uint16(b[1])
-// 	if f < UDPRange {
-// 		srv.UDPReadBytesChan[f] <- tid
-// 	} else {
-// 		srv.TCPReadBytesChan[f-UDPRange] <- tid
-// 	}
-// }
-
-// func (srv *Server) ServeTCPWriteToOut(tid uint16) {
-// 	select {
-// 	case b := <-srv.TCPWriteBytesChan:
-// 		_, err := srv.remoteTCPConn[tid-UDPRange].Write(b)
-// 		if err != nil {
-// 			srv.logger.Errorf("tcp write error: %v", err)
-// 		}
-// 	}
-// }
-
-// func (srv *Server) ServeTCPFromOut(tid uint16, b []byte) {
-// 	defer srv.ReleaseTCPRoutine(tid)
-//
-// 	tcpConn, err := srv.connTCP.AcceptTCP()
-// 	if err != nil {
-// 		srv.logger.Errorf("failed when accepting tcp connection, error: %v", err)
-// 		return
-// 	}
-// 	tcpConn.SetDeadline(time.Now().Add(TCPTimeout))
-// 	defer tcpConn.Close()
-//
-// 	_, err = tcpConn.Read(b)
-// 	if err != nil && err != io.EOF {
-// 		srv.logger.Errorf("failed when reading tcp flow, error: %v", err)
-// 		return
-// 	}
-//
-// 	var message msg.DNSMessage
-// 	_, err = message.Read(b)
-// 	if err != nil {
-// 		srv.logger.Errorf("failed when decoding tcp flow, error: %v", err)
-// 		return
-// 	}
-//
-// 	srv.logger.Infof("new message(tcp) incoming: id, address: %v, %v", message.Header.ID, tcpConn.RemoteAddr())
-//
-// 	conn := mredis.RedisCacheClient.Pool.Get()
-// 	defer conn.Close()
-//
-// 	reply := msg.NewDNSMessageReply(message.Header.ID, message.Header.Flags, message.Question)
-// 	if mredis.FindCache(reply, conn) {
-// 		// reply.Print()
-// 		b, err := reply.CompressToBytes()
-// 		if err != nil {
-// 			srv.logger.Errorf("get redis cache error: %v", err)
-// 			return
-// 		}
-// 		_, err = tcpConn.Write(b)
-// 		if err != nil {
-// 			srv.logger.Errorf("write to client error: %v", err)
-// 			return
-// 		}
-//
-// 		srv.logger.Infof("using redis cache reply to address: %v, %v", message.Header.ID, tcpConn.RemoteAddr())
-// 	} else {
-// 		fid := message.Header.ID
-// 		message.Header.ID = tid
-// 		b, err = message.CompressToBytes()
-// 		// b[0] = byte(tid >> 8)
-// 		// b[1] = byte(tid & 0xff)
-// 		if err != nil {
-// 			srv.logger.Errorf("convert error: %v", err)
-// 			return
-// 		}
-//
-// 		srv.TCPWriteBytesChan <- b
-// 		rid := <-srv.TCPReadBytesChan[tid-UDPRange]
-// 		defer srv.ReleaseTCPReadRoutine(rid)
-// 		b = srv.TCPReadBuffer[rid-UDPRange]
-//
-// 		_, err = message.Read(b)
-// 		if err != nil {
-// 			srv.logger.Errorf("read error: %v", err)
-// 			return
-// 		}
-// 		// if tid != message.Header.ID {
-// 		// 	srv.logger.Errorf("not matching..., serving %v", servingAddr)
-// 		// }
-// 		// message.Print()
-// 		message.Header.ID = fid
-//
-// 		mredis.MessageToRedis(message, conn)
-//
-// 		b, err = message.CompressToBytes()
-//
-// 		// b[0] = byte(fid >> 8)
-// 		// b[1] = byte(fid & 0xff)
-// 		if err != nil {
-// 			srv.logger.Errorf("convert error: %v", err)
-// 			return
-// 		}
-// 		_, err = tcpConn.Write(b)
-// 		if err != nil {
-// 			srv.logger.Errorf("write to client error: %v", err)
-// 			return
-// 		}
-//
-// 		srv.logger.Infof("reply to address: %v, %v", message.Header.ID, tcpConn.RemoteAddr())
-// 	}
-// }
