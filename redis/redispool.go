@@ -6,7 +6,7 @@ import (
 )
 
 type RedisCache struct {
-	pool *redis.Pool
+	Pool *redis.Pool
 }
 
 var (
@@ -16,7 +16,7 @@ var (
 
 func init() {
 	pool = newPool("127.0.0.1:6379", "")
-	RedisCacheClient = &RedisCache{pool: pool}
+	RedisCacheClient = &RedisCache{Pool: pool}
 }
 
 func newPool(server string, password string) *redis.Pool {
@@ -26,10 +26,7 @@ func newPool(server string, password string) *redis.Pool {
 		IdleTimeout: 600 * time.Second,
 		Wait:        true,
 		Dial: func() (redis.Conn, error) {
-			c, err := redis.Dial(
-				"tcp", server, redis.DialPassword(password),
-				redis.DialReadTimeout(5000*time.
-					Millisecond), redis.DialWriteTimeout(5000*time.Millisecond), redis.DialDatabase(10))
+			c, err := redis.Dial("tcp", server, redis.DialPassword(password), redis.DialReadTimeout(5*time.Second), redis.DialWriteTimeout(5*time.Second))
 			if err != nil {
 				return nil, err
 			}

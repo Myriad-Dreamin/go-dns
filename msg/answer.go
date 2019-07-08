@@ -2,7 +2,9 @@ package msg
 
 import (
 	"bytes"
+	"crypto/md5"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -80,8 +82,17 @@ type SOA struct {
 	MinimumTTL      uint32
 }
 
+type MX struct {
+	Preference   uint16
+	MailExchange []byte
+}
+
 func (soa *SOA) Len() int {
 	return len(soa.PrimaryNS) + len(soa.MailTo) + 20
+}
+
+func (mx *MX) Len() int {
+	return len(mx.MailExchange) + 2
 }
 
 func (a DNSAnswer) Size() uint16 {
@@ -93,7 +104,11 @@ func (a DNSAnswer) Size() uint16 {
 	default:
 		panic("???? RDData Must...")
 	}
+}
 
+func (a *DNSAnswer) SetTTL(ttl uint32) bool { // big/little endian problem
+	a.TTL = ttl
+	return true
 }
 
 func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
@@ -139,18 +154,18 @@ func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
 
 	switch a.Type {
 	case rtype.NS, rtype.CNAME:
-		a.RDData, _, err = GetStringFullName(bs, offset+cnt)
+		a.RDData, _, err = GetFullName(bs, offset+cnt)
 		if err != nil {
 			return 0, err
 		}
 	case rtype.SOA:
 		var l2, l3 int
 		rdata := new(SOA)
-		rdata.PrimaryNS, l, err = GetStringFullName(bs, offset+cnt)
+		rdata.PrimaryNS, l, err = GetFullName(bs, offset+cnt)
 		if err != nil {
 			return 0, err
 		}
-		rdata.MailTo, l2, err = GetStringFullName(bs, offset+cnt+l)
+		rdata.MailTo, l2, err = GetFullName(bs, offset+cnt+l)
 		if err != nil {
 			return 0, err
 		}
@@ -165,6 +180,19 @@ func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
 		rw.Read(&rdata.RetryInterval)
 		rw.Read(&rdata.ExpireLimit)
 		rw.Read(&rdata.MinimumTTL)
+		// a.RDLength = uint16(l2 + l3 + 20)
+		a.RDLength = uint16(len(rdata.PrimaryNS) + len(rdata.MailTo) + 20)
+		a.RDData = rdata
+	case rtype.MX:
+		rw := mdnet.NewIO()
+		rdata := new(MX)
+		rw.Write(bs[offset+cnt : offset+cnt+2])
+		rw.Read(&rdata.Preference)
+		rdata.MailExchange, _, err = GetFullName(bs, offset+cnt+2)
+		if err != nil {
+			return 0, err
+		}
+		a.RDLength = uint16(len(rdata.MailExchange) + 2)
 		a.RDData = rdata
 	case rtype.A, rtype.AAAA:
 		fallthrough
@@ -175,8 +203,6 @@ func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
 		}
 		// return 0, errors.New("Resource type not supported")
 	}
-
-	// a.Data
 	cnt += int(a.RDLength)
 	return cnt, nil
 }
@@ -247,12 +273,26 @@ func (a *DNSAnswer) ToBytes() ([]byte, error) {
 	buf.Write(a.Class)
 	buf.Write(a.TTL)
 	buf.Write(a.RDLength)
-	buf.Write(a.RDData)
+	switch a.Type {
+	case rtype.SOA:
+		buf.Write(a.RDData.(*SOA).PrimaryNS)
+		buf.Write(a.RDData.(*SOA).MailTo)
+		buf.Write(a.RDData.(*SOA).SerialNumber)
+		buf.Write(a.RDData.(*SOA).RefreshInterval)
+		buf.Write(a.RDData.(*SOA).RetryInterval)
+		buf.Write(a.RDData.(*SOA).ExpireLimit)
+		buf.Write(a.RDData.(*SOA).MinimumTTL)
+	case rtype.MX:
+		buf.Write(a.RDData.(*MX).Preference)
+		buf.Write(a.RDData.(*MX).MailExchange)
+	default:
+		buf.Write(a.RDData.([]byte))
+	}
 	return buf.Bytes(), nil
 }
 
 func (a *DNSAnswer) SType() (string, error) {
-	stype, suc := typename[a.Type]
+	stype, suc := Typename[a.Type]
 	if suc != true {
 		return "", errors.New("No such RR type")
 	}
@@ -280,4 +320,43 @@ func (a *DNSAnswer) RedisRandomKey() (string, error) {
 		return "", err
 	}
 	return rkey + ":" + strconv.Itoa(int(hash)), nil
+}
+
+func (a *DNSAnswer) RedisHashKey() (string, error) {
+	var bs []byte
+	hash := md5.New()
+	rw := mdnet.NewIO()
+	rw.Write(a.Name)
+	rw.Write(a.Type)
+	rw.Write(a.RDData)
+	bs = rw.Bytes()
+	if _, err := hash.Write(bs); err != nil {
+		return "", err
+	}
+	rkey, err := a.RedisKey()
+	if err != nil {
+		return "", err
+	}
+	return rkey + ":" + hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func (a *DNSAnswer) RedisAuthorityHashKey(qt uint16) (string, error) {
+	var bs []byte
+	var rkey string
+	hash := md5.New()
+	rw := mdnet.NewIO()
+	rw.Write(a.Name)
+	rw.Write(qt)
+	rw.Write(a.Type)
+	rw.Write(a.RDData)
+	bs = rw.Bytes()
+	if _, err := hash.Write(bs); err != nil {
+		return "", err
+	}
+	rkey, err := a.RedisKey()
+	if err != nil {
+		return "", err
+	}
+	rkey += ":" + Typename[qt]
+	return rkey + ":" + hex.EncodeToString(hash.Sum(nil)), nil
 }

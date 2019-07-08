@@ -7,6 +7,8 @@ import (
 	"sync"
 
 	msg "github.com/Myriad-Dreamin/go-dns/msg"
+	mredis "github.com/Myriad-Dreamin/go-dns/redis"
+	// "github.com/garyburd/redigo/redis"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -15,7 +17,8 @@ const (
 	UDPBufferSize = 520
 	TCPRange      = uint16(50)
 	TCPBUfferSize = 65000
-	serverAddr    = "0.0.0.0:53"
+	// serverAddr    = "0.0.0.0:53"
+	serverAddr = "127.0.0.1:53"
 )
 
 type Server struct {
@@ -256,45 +259,69 @@ func (srv *Server) ServeUDPFromOut(tid uint16, b []byte) {
 		return
 	}
 	srv.logger.Infof("new message incoming: id, address: %v, %v", message.Header.ID, servingAddr)
-	fid := message.Header.ID
-	message.Header.ID = tid
-	b, err = message.CompressToBytes()
-	// b[0] = byte(tid >> 8)
-	// b[1] = byte(tid & 0xff)
-	if err != nil {
-		srv.logger.Errorf("convert error: %v", err)
-		return
-	}
 
-	if _, err := srv.remoteConn.Write(b); err != nil {
-		srv.logger.Errorf("write error: %v", err)
-		return
-	}
-	rid := <-srv.UDPReadBytesChan[tid]
-	defer srv.ReleaseUDPReadRoutine(rid)
-	b = srv.UDPReadBuffer[rid]
+	conn := mredis.RedisCacheClient.Pool.Get()
+	defer conn.Close()
 
-	_, err = message.Read(b)
-	// if tid != message.Header.ID {
-	// 	srv.logger.Errorf("not matching..., serving %v", servingAddr)
-	// }
-	// message.Print()
-	message.Header.ID = fid
-	b, err = message.CompressToBytes()
+	reply := msg.NewDNSMessageReply(message.Header.ID, message.Header.Flags, message.Question)
+	if mredis.FindCache(reply, conn) {
+		// reply.Print()
+		b, err := reply.CompressToBytes()
+		if err != nil {
+			srv.logger.Errorf("get redis cache error: %v", err)
+			return
+		}
+		_, err = srv.conn.WriteToUDP(b, servingAddr)
+		if err != nil {
+			srv.logger.Errorf("write to client error: %v", err)
+			return
+		}
 
-	// b[0] = byte(fid >> 8)
-	// b[1] = byte(fid & 0xff)
-	if err != nil {
-		srv.logger.Errorf("convert error: %v", err)
-		return
-	}
-	_, err = srv.conn.WriteToUDP(b, servingAddr)
-	if err != nil {
-		srv.logger.Errorf("write to client error: %v", err)
-		return
-	}
+		srv.logger.Infof("using redis cache reply to address: %v, %v", message.Header.ID, servingAddr)
+	} else {
+		fid := message.Header.ID
+		message.Header.ID = tid
+		b, err = message.CompressToBytes()
+		// b[0] = byte(tid >> 8)
+		// b[1] = byte(tid & 0xff)
+		if err != nil {
+			srv.logger.Errorf("convert error: %v", err)
+			return
+		}
 
-	srv.logger.Infof("reply to address: %v, %v", message.Header.ID, servingAddr)
+		if _, err := srv.remoteConn.Write(b); err != nil {
+			srv.logger.Errorf("write error: %v", err)
+			return
+		}
+		rid := <-srv.UDPReadBytesChan[tid]
+		defer srv.ReleaseUDPReadRoutine(rid)
+		b = srv.UDPReadBuffer[rid]
+
+		_, err = message.Read(b)
+		// if tid != message.Header.ID {
+		// 	srv.logger.Errorf("not matching..., serving %v", servingAddr)
+		// }
+		// message.Print()
+		message.Header.ID = fid
+
+		mredis.MessageToRedis(message, conn)
+
+		b, err = message.CompressToBytes()
+
+		// b[0] = byte(fid >> 8)
+		// b[1] = byte(fid & 0xff)
+		if err != nil {
+			srv.logger.Errorf("convert error: %v", err)
+			return
+		}
+		_, err = srv.conn.WriteToUDP(b, servingAddr)
+		if err != nil {
+			srv.logger.Errorf("write to client error: %v", err)
+			return
+		}
+
+		srv.logger.Infof("reply to address: %v, %v", message.Header.ID, servingAddr)
+	}
 }
 
 func (srv *Server) ReleaseTCPRoutine(tid uint16) {

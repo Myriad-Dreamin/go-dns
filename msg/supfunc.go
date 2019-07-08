@@ -10,7 +10,7 @@ import (
 	mdnet "github.com/Myriad-Dreamin/go-dns/net"
 )
 
-var typename = map[uint16]string{
+var Typename = map[uint16]string{
 	1:  "A",
 	2:  "NS",
 	3:  "MD",

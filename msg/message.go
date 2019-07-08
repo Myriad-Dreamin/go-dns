@@ -32,6 +32,28 @@ type DNSMessage struct {
 	Additional []DNSAnswer
 }
 
+func (m *DNSMessage) InitReply(msgid uint16) {
+	m.Header.ID = msgid
+}
+
+func (m *DNSMessage) InitRecursivelyAvailableReply(msgid uint16, flag uint16) {
+	m.Header.ID = msgid
+	m.Header.Flags = flags.R + flags.RA
+	if flags.HasRD(flag) {
+		m.Header.Flags += flags.RD
+	}
+}
+
+func NewDNSMessageReply(msgid uint16, flag uint16, que []DNSQuestion) (m *DNSMessage) {
+	m = new(DNSMessage)
+	m.InitRecursivelyAvailableReply(msgid, flag)
+	for _, q := range que {
+		m.InsertQuestion(q)
+	}
+	m.Header.QDCount = uint16(len(que))
+	return
+}
+
 // Assuming Empty Message
 func (m *DNSMessage) InitQuery(msgid uint16) {
 	m.Header.ID = msgid

@@ -5,9 +5,9 @@ import (
 	// "github.com/go-redis/redis"
 	"encoding/hex"
 	"github.com/Myriad-Dreamin/go-dns/msg"
-	"github.com/garyburd/redigo/redis"
+	// "github.com/garyburd/redigo/redis"
 	"testing"
-	"time"
+	// "time"
 )
 
 // Get key: google.com:TXT:770906257
@@ -70,58 +70,16 @@ func TestRedis(t *testing.T) {
 	}
 
 	conn := pool.Get()
-	fmt.Println()
+	defer conn.Close()
 	//conn, err := redis.Dial("tcp", "127.0.0.1:6379")
 	if err != nil {
 		fmt.Println("Connect to redis error", err)
 		return
 	}
-	defer conn.Close()
 	// _, err = conn.Do("set", key, val, "EX", msgMessage.Answer[0].TTL) // 5s
-	// _, err = conn.Do("set", key, val) // 5s
+	_, err = conn.Do("set", "a", 0, "EX", 3) // 5s
 	if err != nil {
 		fmt.Println("redis set failed:", err)
 	}
 
-	if err = PushToRedis(msgMessage.Answer, conn); err != nil {
-		fmt.Println(err)
-		return
-	}
-	if err = PushToRedis(msgMessage.Authority, conn); err != nil {
-		fmt.Println(err)
-		return
-	}
-	if err = PushToRedis(msgMessage.Additional, conn); err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	searchkey, err := msgMessage.Question[0].RedisKey()
-
-	// fmt.Println(searchkey)
-
-	// keys, err := redis.Strings(conn.Do("keys", searchkey+":*"))
-	conn.Send("keys", searchkey+":*")
-	conn.Flush()
-	keys, err := redis.Strings(conn.Receive())
-
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	for _, k := range keys {
-
-		keyval, err := redis.Bytes(conn.Do("GET", k))
-
-		var redismsg msg.DNSAnswer
-		redismsg.ReadFrom(keyval, 0)
-		if err != nil {
-			fmt.Println("redis get failed:", err)
-		} else {
-			fmt.Printf("Get key: %s \n", k)
-			redismsg.Print()
-		}
-		time.Sleep(1 * time.Second)
-	}
 }
