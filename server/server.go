@@ -168,7 +168,7 @@ c00c
 
 func (srv *Server) LookUpA(host, req string) (ret string, err error) {
 
-	if err = srv.tryConnectToRemoteDNSServer(host + ":53"); err != nil {
+	if err = srv.tryConnectToRemoteDNSServer(host); err != nil {
 		return
 	}
 
@@ -237,6 +237,8 @@ func (srv *Server) ServeUDPReadFromOut(tid uint16, b []byte) {
 		srv.logger.Errorf("read error: %v", err)
 		return
 	}
+
+	// fast extract id from message
 	srv.UDPReadBytesChan[(uint16(b[0])<<8)+uint16(b[1])] <- tid
 }
 

@@ -21,7 +21,8 @@ const (
 	MX
 	TXT
 
-	OPT Type = 41
+	AAAA Type = 28
+	OPT  Type = 41
 
 	AXFR Type = iota + 252
 	MALIB
