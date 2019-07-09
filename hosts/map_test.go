@@ -62,12 +62,24 @@ func TestReg(t *testing.T) {
 	fmt.Println(b)
 	b = testFQDN([]byte("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
 	fmt.Println(b)
+
+	b = isIPv4([]byte("0.0.0.0"))
+	fmt.Println(b)
+	b = isIPv4([]byte("3.4.33.239"))
+	fmt.Println(b)
+	b = isIPv4([]byte("0.0.0.0.0"))
+	fmt.Println(b)
+	b = isIPv4([]byte("0.0.0"))
+	fmt.Println(b)
+	b = isIPv4([]byte("3.4.33.2239"))
+	fmt.Println(b)
 }
 
 func TestRead(t *testing.T) {
 	fmt.Println(Process("test.txt"))
 }
-func TestRead2(t *testing.T) {
-	_, err := Process("dnsrelay.txt")
-	fmt.Println(err)
-}
+
+// func TestRead2(t *testing.T) {
+// 	_, _, err := Process("dnsrelay.txt")
+// 	fmt.Println(err)
+// }
