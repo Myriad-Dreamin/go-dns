@@ -24,6 +24,7 @@ var (
 	cfgContext  string = "config.toml"
 	cfgLock     sync.RWMutex
 	parseConfig sync.Once
+	Hostsfile   = "/home/saint/Program/go-dns/hosts/hosts"
 )
 
 type Configuration struct {

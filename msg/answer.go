@@ -106,6 +106,14 @@ func (a DNSAnswer) Size() uint16 {
 	}
 }
 
+func InitReply(q DNSQuestion) *DNSAnswer {
+	a := new(DNSAnswer)
+	a.Name = q.Name
+	a.Type = q.Type
+	a.Class = q.Class
+	return a
+}
+
 func (a *DNSAnswer) SetTTL(ttl uint32) bool { // big/little endian problem
 	a.TTL = ttl
 	return true

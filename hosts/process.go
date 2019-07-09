@@ -9,9 +9,13 @@ import (
 	"net"
 	"os"
 	"regexp"
+
+	config "github.com/Myriad-Dreamin/go-dns/config"
 )
 
 var (
+	HostsIPv4      map[string]net.IP
+	HostsIPv6      map[string]net.IP
 	errTooMuchItem = errors.New("too much item in a line")
 	errIPFormat    = errors.New("bad format of ip")
 	errFQDNFormat  = errors.New("bad format of domain name")
@@ -63,6 +67,8 @@ func testFQDN(fqdn []byte) bool {
 // func testFQDNx(fqdn []byte) bool {
 // 	return regs.Match(fqdn) || rega.Match(fqdn)
 // }
+
+// func ToIPv4Bytes(net.I)
 
 func Process(filePath string) (HostMapping, HostMapping, error) {
 	f, err := os.Open(filePath)
@@ -171,4 +177,12 @@ func Process(filePath string) (HostMapping, HostMapping, error) {
 		}
 	}
 	return ret4, ret6, err
+}
+
+func init() {
+	var err error
+	HostsIPv4, HostsIPv6, err = Process(config.Hostsfile)
+	if err != nil {
+		panic(err)
+	}
 }

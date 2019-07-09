@@ -5,7 +5,9 @@ import (
 	"net"
 	"time"
 
+	hosts "github.com/Myriad-Dreamin/go-dns/hosts"
 	msg "github.com/Myriad-Dreamin/go-dns/msg"
+	qtype "github.com/Myriad-Dreamin/go-dns/msg/rec/qtype"
 	mredis "github.com/Myriad-Dreamin/go-dns/redis"
 	log "github.com/sirupsen/logrus"
 )
@@ -245,11 +247,43 @@ func (udpDispatcher *UDPDispatcher) ServeUDPFromOut(tid uint16, b []byte) {
 		}
 
 		udpDispatcher.logger.Infof("new message incoming: id, address: %v, %v", message.Header.ID, servingAddr)
+		reply := msg.NewDNSMessageReply(message.Header.ID, message.Header.Flags, message.Question)
+
+		if message.Question[0].Type == qtype.A || message.Question[0].Type == qtype.AAAA {
+			var (
+				ipaddr net.IP
+				ok     bool
+			)
+			if message.Question[0].Type == qtype.A {
+				ipaddr, ok = hosts.HostsIPv4[string(message.Question[0].Name)]
+				ipaddr = ipaddr.To4()
+			} else {
+				ipaddr, ok = hosts.HostsIPv6[string(message.Question[0].Name)]
+			}
+			if ok == true {
+				replyans := msg.InitReply(message.Question[0])
+				replyans.RDData = []byte(ipaddr)
+				replyans.RDLength = uint16(len(replyans.RDData.([]byte)))
+				//TODO verify
+				reply.InsertAnswer(*replyans)
+				b, err := reply.CompressToBytes()
+				if err != nil {
+					udpDispatcher.logger.Errorf("get redis cache error: %v", err)
+					return
+				}
+				_, err = udpDispatcher.connUDP.WriteToUDP(b, servingAddr)
+				if err != nil {
+					udpDispatcher.logger.Errorf("write to client error: %v", err)
+					return
+				}
+				udpDispatcher.logger.Infof("using hosts reply to address: %v, %v", message.Header.ID, servingAddr)
+				return
+			}
+
+		}
 
 		conn := mredis.RedisCacheClient.Pool.Get()
 		defer conn.Close()
-
-		reply := msg.NewDNSMessageReply(message.Header.ID, message.Header.Flags, message.Question)
 		if mredis.FindCache(reply, conn) {
 			// reply.Print()
 			b, err := reply.CompressToBytes()
