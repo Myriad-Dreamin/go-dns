@@ -87,6 +87,7 @@ func (rt *TCPRemoteServerRoutine) Run() {
 		select {
 		case <-rt.QuitRequest:
 			rt.quit <- true
+			fmt.Println("TCPRemoteServerRoutine")
 			return
 		case bmsg := <-rt.MessageChan:
 			fmt.Println("ready to write")
@@ -133,12 +134,19 @@ func (rt *TCPRemoteServerRoutine) Run() {
 				if rt.readNumber != 0 {
 					if rt.Buffer.Len() >= int(rt.readNumber) {
 						bb := rt.bufferPool.Get().(*bytes.Buffer)
+						bb.Reset()
 						var tid uint16
 						binary.Read(rt.Buffer, binary.BigEndian, &tid)
 						binary.Write(bb, binary.BigEndian, &tid)
-						fmt.Println("getting...", tid)
-						io.TeeReader(io.LimitReader(rt.Buffer, int64(rt.readNumber-2)), bb)
+						_, err := io.TeeReader(io.LimitReader(rt.Buffer, int64(rt.readNumber-2)), bb).Read(b)
+
+						fmt.Println("getting...", tid, bb)
 						rt.readNumber = 0
+						if err != nil {
+							rt.logger.Errorf("trans buffering error: %v", err)
+							continue
+						}
+
 						rt.dispatcher.tcpUserRoutine[tid].MessageChan <- bb
 					} else {
 						break

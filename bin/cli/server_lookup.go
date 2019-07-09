@@ -208,6 +208,7 @@ func (cmd *ServerLookUpACmd) TCPLookUpA(host, req string) (ret string, err error
 			return "", err
 		}
 		cmd.logger.Infof("reading")
+		time.Sleep(time.Second)
 		b = make([]byte, 65535)
 		conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 		n, err = conn.Read(b)

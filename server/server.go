@@ -20,8 +20,9 @@ const (
 	TCPRange      = uint16(5)
 	TCPBufferSize = 65000
 	TCPTimeout    = 10 * time.Second
-	serverAddr    = "192.168.42.9:53"
-	// serverAddr = "127.0.0.1:53"
+	// serverAddr    = "0.0.0.0:53"
+	// serverAddr    = "192.168.42.9:53"
+	serverAddr = "127.0.0.1:53"
 )
 
 type Server struct {

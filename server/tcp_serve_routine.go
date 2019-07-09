@@ -53,6 +53,7 @@ func (rt *TCPUserRoutine) Run() {
 		select {
 		case <-rt.QuitRequest:
 			rt.quit <- true
+			fmt.Println("TCPUserRoutine")
 			return
 		default:
 			var tcpConn *net.TCPConn
@@ -82,63 +83,42 @@ func (rt *TCPUserRoutine) Run() {
 			tcpConn.SetDeadline(time.Now().Add(TCPTimeout))
 			rt.Buffer.Reset()
 			var b, c []byte
+			b = rt.bytesPool.Get().([]byte)
 			rt.readNumber = 0
 			conn := mredis.RedisCacheClient.Pool.Get()
 			for {
 				// accept a dns message
 				for {
-					if rt.readNumber != 0 {
-						if rt.Buffer.Len() >= int(rt.readNumber) {
-							c = rt.Buffer.Next(int(rt.readNumber))
-							break
-						}
-					} else if rt.Buffer.Len() > 1 {
+					if rt.Buffer.Len() > 1 && rt.readNumber == 0 {
 						binary.Read(rt.Buffer, binary.BigEndian, &rt.readNumber)
 					}
-
-					if rt.readNumber != 0 {
-						if rt.Buffer.Len() >= int(rt.readNumber) {
-							c = rt.Buffer.Next(int(rt.readNumber))
-							break
-						}
+					if rt.readNumber != 0 && rt.Buffer.Len() >= int(rt.readNumber) {
+						c = rt.Buffer.Next(int(rt.readNumber))
+						break
 					}
+
+					tcpConn.SetDeadline(time.Now().Add(TCPTimeout))
 					n, err = tcpConn.Read(b)
 					if err != nil {
 						if err != io.EOF {
 							rt.logger.Errorf("failed when reading tcp flow, error: %v", err)
 						}
+						rt.logger.Errorf("failed when reading tcp flow, error: %v", err)
 						rt.readNumber = 0
 						break
 					}
+					fmt.Println(rt.tid, "buffer cap", len(b), rt.Buffer.Cap())
+					fmt.Println("?", rt.readNumber, b[0:n])
 					if n == 0 {
 						continue
 					}
 					tcpConn.SetDeadline(time.Now().Add(TCPTimeout))
-					fmt.Println(rt.tid, "buffer cap", len(b), rt.Buffer.Cap())
-					fmt.Println("?", rt.readNumber, b[0:n])
 					_, err = rt.Buffer.Write(b[0:n])
 					if err != nil {
 						rt.logger.Errorf("buffering error: %v", err)
 						rt.Buffer.Reset()
 						rt.readNumber = 0
 						break
-					}
-					if rt.readNumber != 0 {
-						fmt.Println("??", rt.Buffer.Len(), int(rt.readNumber))
-						if rt.Buffer.Len() >= int(rt.readNumber) {
-							c = rt.Buffer.Next(int(rt.readNumber))
-							break
-						}
-					} else if rt.Buffer.Len() > 1 {
-						binary.Read(rt.Buffer, binary.BigEndian, &rt.readNumber)
-					}
-
-					if rt.readNumber != 0 {
-						fmt.Println("??", rt.Buffer.Len(), int(rt.readNumber))
-						if rt.Buffer.Len() >= int(rt.readNumber) {
-							c = rt.Buffer.Next(int(rt.readNumber))
-							break
-						}
 					}
 				}
 				// the message is stored in c([]byte)
@@ -162,6 +142,7 @@ func (rt *TCPUserRoutine) Run() {
 
 				// read bad message
 				if rt.readNumber == 0 {
+					rt.logger.Errorf("aborted %v", rt.tid)
 					goto reset_and_reaccept_new_link
 				}
 
@@ -188,13 +169,21 @@ func (rt *TCPUserRoutine) Run() {
 						conn.Close()
 						break
 					}
+
 					tcpConn.SetDeadline(time.Now().Add(TCPTimeout))
+
+					var lenb = uint16(len(b))
+					fmt.Println(lenb, b)
+					err = binary.Write(tcpConn, binary.BigEndian, &lenb)
+					if err != nil {
+						rt.logger.Errorf("write to client error: %v", err)
+						goto reset_and_reaccept_new_link
+					}
+
 					_, err = tcpConn.Write(b)
 					if err != nil {
 						rt.logger.Errorf("write to client error: %v", err)
-						tcpConn.Close()
-						conn.Close()
-						break
+						goto reset_and_reaccept_new_link
 					}
 
 					rt.logger.Infof("using redis cache reply to address: %v, %v", message.Header.ID, tcpConn.RemoteAddr())
@@ -227,7 +216,7 @@ func (rt *TCPUserRoutine) Run() {
 					rt.dispatcher.messageChan <- buf
 					select {
 					case buf = <-rt.MessageChan:
-					case <-time.After(time.Second * 1):
+					case <-time.After(time.Second * 10):
 						//todo: reply...
 						rt.logger.Errorf("timeout: routine name, %v", rt.tid)
 						goto reset_and_reaccept_new_link
@@ -258,6 +247,15 @@ func (rt *TCPUserRoutine) Run() {
 						goto reset_and_reaccept_new_link
 					}
 					tcpConn.SetDeadline(time.Now().Add(TCPTimeout))
+
+					var lenb = uint16(len(b))
+					fmt.Println(lenb, b)
+					err = binary.Write(tcpConn, binary.BigEndian, &lenb)
+					if err != nil {
+						rt.logger.Errorf("write to client error: %v", err)
+						goto reset_and_reaccept_new_link
+					}
+
 					_, err = tcpConn.Write(b)
 					if err != nil {
 						rt.logger.Errorf("write to client error: %v", err)
