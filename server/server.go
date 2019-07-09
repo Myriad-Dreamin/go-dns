@@ -15,7 +15,9 @@ import (
 )
 
 const (
-	UDPRange      = uint16(5)
+	UDPRange = uint16(5)
+
+	// EDNS > 512, DNS <= 512
 	UDPBufferSize = 520
 	TCPRange      = uint16(5)
 	TCPBufferSize = 65000
