@@ -39,6 +39,37 @@ const (
 	test0to255 = "([0-9]|([1-9][0-9])|(1([0-9]{2}))|(2[0-4][0-9])|(25[0-5]))"
 )
 
+/*
+<domain> ::= <subdomain> | " "
+
+<subdomain> ::= <label> | <subdomain> "." <label>
+
+<label> ::= <letter> [ [ <ldh-str> ] <let-dig> ]
+
+<ldh-str> ::= <let-dig-hyp> | <let-dig-hyp> <ldh-str>
+
+<let-dig-hyp> ::= <let-dig> | "-"
+
+<let-dig> ::= <letter> | <digit>
+
+<letter> ::= any one of the 52 alphabetic characters A through Z in
+upper case and a through z in lower case
+
+<digit> ::= any one of the ten digits 0 through 9
+
+labels          63 octets or less
+names           255 octets or less
+
+in golang:
+
+	label := [:alpha:] [-[:alnum:]]* [:alnum:]{0:1}
+	subdomain := (<label> \.)* <label>
+	domain := " " | <subdomain>
+
+
+
+*/
+
 var (
 	testipv4 = "^(" + test0to255 + "\\." + test0to255 + "\\." + test0to255 + "\\." + test0to255 + ")$"
 	testipv  = "^(" + test0to255 + ")$"
@@ -61,6 +92,9 @@ func isIPv4(ipaddr []byte) bool {
 }
 
 func testFQDN(fqdn []byte) bool {
+	if len(fqdn) > 255 {
+		return false
+	}
 	return regFQDN.Match(fqdn)
 }
 
