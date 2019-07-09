@@ -14,7 +14,7 @@ const (
 	SrvName   = "go-dns"
 	Usage     = "local dns server"
 	UsageText = "local dns server"
-	Version   = "0.0.0"
+	Version   = "0.1.0"
 )
 
 type ServerX struct {

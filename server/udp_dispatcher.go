@@ -43,10 +43,11 @@ func NewUDPDispatcher(
 	if udpRange != idRangeR-idRangeL {
 		return
 	}
+	var bp = NewBytesPool(maxSize)
 	up = &UDPDispatcher{
 		logger:           logger,
-		bytesPool:        NewBytesPool(maxSize),
-		bufferPool:       NewBufferPool(),
+		bytesPool:        bp,
+		bufferPool:       NewBufferPool(bp),
 		tidL:             idRangeL,
 		tidR:             idRangeR,
 		udpRange:         udpRange,

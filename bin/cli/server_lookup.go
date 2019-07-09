@@ -158,12 +158,14 @@ func (cmd *ServerLookUpACmd) TCPLookUpA(host, req string) (ret string, err error
 		ad, err := net.ResolveTCPAddr("tcp", host)
 		if err != nil {
 			cmd.logger.Errorf("error occurred when dial remote dns server: %v\n", err)
+			return
 		}
 		conn, err = net.DialTCP(network, nil, ad)
-		fmt.Println(conn.LocalAddr(), conn.RemoteAddr())
 		if err != nil {
 			cmd.logger.Errorf("error occurred when dial remote dns server: %v\n", err)
+			return
 		}
+		fmt.Println(conn.LocalAddr(), conn.RemoteAddr())
 		return
 	}(); err != nil {
 		return
@@ -196,7 +198,7 @@ func (cmd *ServerLookUpACmd) TCPLookUpA(host, req string) (ret string, err error
 		cmd.logger.Infof("Writing")
 		var lb = make([]byte, 2)
 		binary.BigEndian.PutUint16(lb, uint16(len(b)))
-		fmt.Println(lb)
+		fmt.Println(lb, b)
 		if _, err := conn.Write(lb); err != nil {
 			cmd.logger.Errorf("write error: %v", err)
 			return "", err
@@ -208,7 +210,7 @@ func (cmd *ServerLookUpACmd) TCPLookUpA(host, req string) (ret string, err error
 		cmd.logger.Infof("reading")
 		b = make([]byte, 65535)
 		conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-		_, err = conn.Read(b)
+		n, err = conn.Read(b)
 		if err != nil && err != io.EOF {
 			cmd.logger.Errorf("read error: %v", err)
 			return "", err
@@ -216,6 +218,7 @@ func (cmd *ServerLookUpACmd) TCPLookUpA(host, req string) (ret string, err error
 		var x uint16
 		binary.Read(bytes.NewBuffer(b), binary.BigEndian, &x)
 		b = b[2 : 2+x]
+		fmt.Println(x, b)
 
 		var rmsg = new(msg.DNSMessage)
 		n, err = rmsg.Read(b)

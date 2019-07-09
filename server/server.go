@@ -15,13 +15,13 @@ import (
 )
 
 const (
-	UDPRange      = uint16(1000)
+	UDPRange      = uint16(5)
 	UDPBufferSize = 520
 	TCPRange      = uint16(5)
 	TCPBufferSize = 65000
 	TCPTimeout    = 10 * time.Second
-	// serverAddr    = "0.0.0.0:53"
-	serverAddr = "127.0.0.1:53"
+	serverAddr    = "192.168.42.9:53"
+	// serverAddr = "127.0.0.1:53"
 )
 
 type Server struct {
@@ -154,8 +154,8 @@ func (srv *Server) setupTCPDispatcher() error {
 	srv.TCPDispatcher = NewTCPDispatcher(
 		srv.logger,
 		TCPBufferSize,
-		UDPRange,
-		UDPRange+TCPRange,
+		0,
+		TCPRange,
 		TCPRange,
 	)
 	if srv.TCPDispatcher == nil {

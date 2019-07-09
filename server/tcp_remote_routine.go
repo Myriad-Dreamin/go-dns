@@ -37,7 +37,7 @@ func NewTCPRemoteServerRoutine(
 ) (rt *TCPRemoteServerRoutine) {
 	rt = &TCPRemoteServerRoutine{
 		sharedSpace:   sharedSpace,
-		Buffer:        new(bytes.Buffer),
+		Buffer:        sharedSpace.bufferPool.Get().(*bytes.Buffer),
 		MessageChan:   make(chan *bytes.Buffer),
 		QuitRequest:   make(chan bool, 1),
 		network:       network,
@@ -89,6 +89,7 @@ func (rt *TCPRemoteServerRoutine) Run() {
 			rt.quit <- true
 			return
 		case bmsg := <-rt.MessageChan:
+			fmt.Println("ready to write")
 			rt.remoteTCPConn.SetWriteDeadline(time.Now().Add(1 * time.Second))
 			err := binary.Write(rt.remoteTCPConn, binary.BigEndian, uint16(bmsg.Len()))
 			if err != nil {
@@ -106,23 +107,18 @@ func (rt *TCPRemoteServerRoutine) Run() {
 			_, err := rt.remoteTCPConn.Read(b)
 			if err != nil {
 				if er, ok := err.(net.Error); !ok {
-					if err == io.EOF {
-						if err = rt.tryReDial(); err != nil {
-							rt.logger.Errorf("redial failed, error: %v, returned", err)
-							return
-						}
-						continue
+					rt.logger.Errorf("failed when reading message, error: %v", err)
+				} else if er.Timeout() {
+					if len(rt.QuitRequest) != 0 {
+						rt.quit <- true
+						return
 					}
+					rt.remoteTCPConn.SetDeadline(time.Now().Add(1 * time.Second))
 				} else {
-					if er.Timeout() {
-						rt.dispatcher.connTCP.SetDeadline(time.Now().Add(1 * time.Second))
-						continue
-					}
+					rt.logger.Errorf("failed when reading message, error: %v %v", err, er.Temporary())
 				}
-				rt.logger.Errorf("read error: %v", err)
 				continue
 			}
-			fmt.Println(rt.Buffer.Cap())
 			_, err = rt.Buffer.Write(b)
 			if err != nil {
 				rt.logger.Errorf("buffering error: %v", err)
@@ -140,7 +136,9 @@ func (rt *TCPRemoteServerRoutine) Run() {
 						var tid uint16
 						binary.Read(rt.Buffer, binary.BigEndian, &tid)
 						binary.Write(bb, binary.BigEndian, &tid)
+						fmt.Println("getting...", tid)
 						io.TeeReader(io.LimitReader(rt.Buffer, int64(rt.readNumber-2)), bb)
+						rt.readNumber = 0
 						rt.dispatcher.tcpUserRoutine[tid].MessageChan <- bb
 					} else {
 						break
@@ -154,6 +152,7 @@ func (rt *TCPRemoteServerRoutine) Run() {
 				_, err = rt.Buffer.WriteTo(t)
 				if err != nil {
 					rt.logger.Errorf("convert buffering error: %v", err)
+					rt.bufferPool.Put(t)
 					continue
 				} else {
 					rt.Buffer.Reset()
