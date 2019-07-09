@@ -45,6 +45,7 @@ func AuthorityToRedis(que msg.DNSQuestion, answers []msg.DNSAnswer, conn redis.C
 	var cnt int
 	for _, ans := range answers {
 		key, err := ans.RedisAuthorityHashKey(que.Type)
+		// fmt.Println("TEST\n", key)
 		if err != nil {
 			return 0, err
 		}
@@ -61,8 +62,10 @@ func AuthorityToRedis(que msg.DNSQuestion, answers []msg.DNSAnswer, conn redis.C
 			return 0, errors.New("Type it not suppoted by redis")
 		}
 		if !bytes.Equal(que.Name, ans.Name) {
+			tmp := ans.Name
 			ans.Name = que.Name
 			key, err := ans.RedisAuthorityHashKey(que.Type)
+			// fmt.Println("TEST  2\n", key)
 			if err != nil {
 				return 0, err
 			}
@@ -79,6 +82,7 @@ func AuthorityToRedis(que msg.DNSQuestion, answers []msg.DNSAnswer, conn redis.C
 			default:
 				return 0, errors.New("Type it not suppoted by redis")
 			}
+			ans.Name = tmp
 		}
 
 	}
@@ -149,7 +153,11 @@ func FindCache(m *msg.DNSMessage, conn redis.Conn) bool {
 					replyans.ReadFrom(bs, 0)
 					m.InsertAnswer(replyans)
 					// searchkey, err = replyans.RedisKey()
-					domain = string(replyans.RDData.([]byte))
+					bytesdomain, _, err := msg.GetStringFullName(replyans.RDData.([]byte), 0)
+					if err != nil {
+						return false
+					}
+					domain = string(bytesdomain)
 					searchkey = domain + ":" + msg.Typename[que.Type]
 				} else {
 					break
