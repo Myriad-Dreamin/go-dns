@@ -88,7 +88,7 @@ type MX struct {
 }
 
 func (soa *SOA) Len() int {
-	return len(soa.PrimaryNS) + len(soa.MailTo) + 10
+	return len(soa.PrimaryNS) + len(soa.MailTo) + 20
 }
 
 func (mx *MX) Len() int {
