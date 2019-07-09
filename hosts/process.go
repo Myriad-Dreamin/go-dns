@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"os"
@@ -29,8 +28,8 @@ func findChar(l []byte, c byte) int {
 }
 
 const (
-	test62NRegExp = "|"
-	test63NRegExp = "^([0-9A-Za-z](()|([-0-9A-Za-z]{0,61}[0-9A-Za-z])))$"
+// test62NRegExp = "|"
+// test63NRegExp = "^([0-9A-Za-z](()|([-0-9A-Za-z]{0,61}[0-9A-Za-z])))$"
 
 // test0to255 = "[0:9]|[1:9][0:9]|1[0:9]{2}|2[0:4][0:9]|25[0:5]"
 // testipv4   = "^" + test0to255 + `\.` + test0to255 + `\.` + test0to255 + `\.` + test0to255 + "$"
@@ -38,8 +37,8 @@ const (
 
 var (
 	regFQDN = regexp.MustCompile("^(([0-9A-Za-z](()|([-0-9A-Za-z]{0,61}[0-9A-Za-z])))|((([0-9A-Za-z](()|([-0-9A-Za-z]{0,61}[0-9A-Za-z]))\\.)*)([0-9A-Za-z](()|([-0-9A-Za-z]{0,60}[0-9A-Za-z])))))$")
-	rega    = regexp.MustCompile(test63NRegExp)
-	regs    = regexp.MustCompile("^(([0-9A-Za-z](()|([-0-9A-Za-z]{0,61}[0-9A-Za-z]))\\.)*)([0-9A-Za-z](()|([-0-9A-Za-z]{0,60}[0-9A-Za-z])))$")
+	// rega    = regexp.MustCompile(test63NRegExp)
+	// regs    = regexp.MustCompile("^(([0-9A-Za-z](()|([-0-9A-Za-z]{0,61}[0-9A-Za-z]))\\.)*)([0-9A-Za-z](()|([-0-9A-Za-z]{0,60}[0-9A-Za-z])))$")
 )
 
 func testIP(ipaddr []byte) bool {
@@ -50,9 +49,9 @@ func testFQDN(fqdn []byte) bool {
 	return regFQDN.Match(fqdn)
 }
 
-func testFQDNx(fqdn []byte) bool {
-	return regs.Match(fqdn) || rega.Match(fqdn)
-}
+// func testFQDNx(fqdn []byte) bool {
+// 	return regs.Match(fqdn) || rega.Match(fqdn)
+// }
 
 func Process(filePath string) (HostMapping, error) {
 	f, err := os.Open(filePath)
@@ -84,12 +83,10 @@ func Process(filePath string) (HostMapping, error) {
 		ipBytes, line = line[0:sp], bytes.TrimSpace(line[sp:])
 		sp = findChar(line, ' ')
 		fqdnBytes, line = line[0:sp], bytes.TrimSpace(line[sp:])
-		if len(line) != 0 {
+		if len(line) != 0 && line[0] != '#' {
 			return nil, errTooMuchItem
 		}
-		fmt.Println(string(ipBytes), string(fqdnBytes))
 
-		fmt.Println(testIP(ipBytes), testFQDN(fqdnBytes))
 		if !testIP(ipBytes) {
 			return nil, errIPFormat
 		}
@@ -98,5 +95,5 @@ func Process(filePath string) (HostMapping, error) {
 		}
 		ret[string(fqdnBytes)] = ipBytes
 	}
-	return nil, nil
+	return ret, nil
 }

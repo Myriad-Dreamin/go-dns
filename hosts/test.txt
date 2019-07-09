@@ -2,7 +2,7 @@
     #         0.0.0.0 2qq.cn
       0.0.0.0 555.265.com
        0.0.0.0 abc.265.com
-60.222.224.141 www.pku.edu.cn 
+60.222.224.141 www.pku.edu.cn
 
 
 #  64.233.168.84 accounts.google.com
