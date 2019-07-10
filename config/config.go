@@ -26,7 +26,7 @@ var (
 		defaultHostsConfig,
 	}
 	cfg         *Configuration
-	cfgContext  string = "config.toml"
+	cfgContext  string = "./config.toml"
 	cfgLock     sync.RWMutex
 	parseConfig sync.Once
 	Hostsfile   = "/home/saint/Program/go-dns/hosts/hosts"
@@ -52,7 +52,7 @@ type HostsConfig struct {
 }
 
 func Config() *Configuration {
-	parseConfig.Do(ReloadConfiguration)
+	parseConfig.Do(func() { ReloadConfiguration() })
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
 	return cfg
@@ -63,7 +63,7 @@ func ResetPath(path string) {
 	ReloadConfiguration()
 }
 
-func ReloadConfiguration() {
+func ReloadConfiguration() error {
 	filePath, err := filepath.Abs(cfgContext)
 	if err != nil {
 		panic(err)
@@ -72,11 +72,12 @@ func ReloadConfiguration() {
 	config := new(Configuration)
 	*config = *defaultConfig
 	if _, err := toml.DecodeFile(filePath, config); err != nil {
-		panic(err)
+		return err
 	}
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	cfg = config
+	return nil
 }
 
 // func init() {
