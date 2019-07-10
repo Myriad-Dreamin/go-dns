@@ -202,7 +202,7 @@ func (a *DNSAnswer) ReadFrom(bs []byte, offset int) (int, error) {
 		}
 		a.RDLength = uint16(len(rdata.MailExchange) + 2)
 		a.RDData = rdata
-	case rtype.A, rtype.AAAA:
+	case rtype.A, rtype.AAAA, rtype.TXT:
 		fallthrough
 	default:
 		a.RDData, err = ReadnBytes(buffer, int(a.RDLength))

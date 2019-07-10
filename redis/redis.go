@@ -23,7 +23,7 @@ func AnswersToRedis(answers []msg.DNSAnswer, conn redis.Conn) (int, error) {
 		// conn.Do("set", key, b, "EX", ans.TTL)
 		key, err = ans.RedisHashKey()
 		switch ans.Type {
-		case rtype.A, rtype.NS, rtype.CNAME, rtype.AAAA, rtype.MX:
+		case rtype.A, rtype.NS, rtype.CNAME, rtype.AAAA, rtype.MX, rtype.TXT:
 			key, err = ans.RedisHashKey()
 		default:
 			return 0, errors.New("Type it not suppoted")
@@ -177,7 +177,7 @@ func FindCache(m *msg.DNSMessage, conn redis.Conn) bool {
 			} else {
 				return InsertAnswer(m, keys, conn)
 			}
-		case qtype.NS, qtype.CNAME:
+		case qtype.NS, qtype.CNAME, qtype.TXT:
 			keys, err := redis.Strings(conn.Do("keys", searchkey+":*"))
 			if err != nil {
 				return false
