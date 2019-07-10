@@ -211,7 +211,7 @@
 69.43.161.167 www.x.com.cn
 199.255.240.88 www.z.com.cn
 60.222.224.141 www.bupt.com.cn
-60.222.224.141 www.pku.edu.cn 
+60.222.224.141 www.pku.edu.cn
 
 
 64.233.168.84 accounts.google.com
@@ -909,3 +909,12 @@
 74.125.207.132 2.bp.blogspot.com
 74.125.207.132 3.bp.blogspot.com
 74.125.207.132 4.bp.blogspot.com
+
+
+#2404:6800:4008:c02::8b com.google
+2404:6800:4008:c07::71 www.registry.google
+#2001:4860:4802:32::1d registry.google
+2001:4860:4802:32::1d nic.google
+2001:4860:4802:32::15 blog.google
+#2404:6800:4008:801::2013 www.blog.google #ghs-svc-https-sni.ghs-ssl.googlehosted.com
+3.3.3.3 www.abc.com www.bcd.com

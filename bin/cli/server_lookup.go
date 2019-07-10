@@ -119,6 +119,7 @@ func (cmd *ServerLookUpACmd) UDPLookUpA(host, req string) (ret string, err error
 
 		fmt.Println(n, s)
 		b, err := s.ToBytes()
+		b = append(b, []byte{1, 2, 3, 0, 6}...)
 		if err != nil {
 			cmd.logger.Errorf("convert request message error: %v", err)
 			return "", err

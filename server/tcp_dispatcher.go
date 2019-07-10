@@ -18,7 +18,7 @@ func NewBytesPool(maxSize int64) *BytesPool {
 		Pool: &sync.Pool{
 			New: func() interface{} {
 				xx := make([]byte, maxSize)
-				fmt.Println("get bytes", len(xx), cap(xx))
+				// fmt.Println("get bytes", len(xx), cap(xx))
 				return xx
 			},
 		},
@@ -34,9 +34,9 @@ func NewBufferPool(bf *BytesPool) *BufferPool {
 		Pool: &sync.Pool{
 			New: func() interface{} {
 				xx := bf.Get().([]byte)
-				fmt.Println("set bytes", len(xx), cap(xx))
+				// fmt.Println("set bytes", len(xx), cap(xx))
 				s := bytes.NewBuffer(xx)
-				fmt.Println("get buffer", s.Len(), s.Cap())
+				// fmt.Println("get buffer", s.Len(), s.Cap())
 				s.Reset()
 				return s
 			},
@@ -124,7 +124,7 @@ func (d *TCPDispatcher) Prepare(network string, host *net.TCPAddr) (err error) {
 			return
 		}
 
-		fmt.Println(i)
+		// fmt.Println(i)
 		d.tcpUserRoutine[i] = NewTCPUserRoutine(d.sharedSpace, i)
 		if d.tcpRemoteServerRoutine[i] == nil {
 			err = fmt.Errorf("new tcp user routine failed at %v", i)
@@ -149,7 +149,7 @@ func (d *TCPDispatcher) Start(qc *chan bool) (err error) {
 	// 	syscall.SIGKILL, syscall.SIGILL, syscall.SIGTERM,
 	// )
 	for i := d.tidL; i < d.tidR; i++ {
-		fmt.Println(i)
+		// fmt.Println(i)
 		go d.tcpRemoteServerRoutine[i].Run()
 		go d.tcpUserRoutine[i].Run()
 	}
