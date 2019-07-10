@@ -140,6 +140,8 @@ func (rt *TCPUserRoutine) Run() {
 					}
 				}
 
+				fmt.Println("receive message :\n", rt.tid)
+
 				// read bad message
 				if rt.readNumber == 0 {
 					rt.logger.Errorf("aborted %v", rt.tid)
@@ -160,6 +162,7 @@ func (rt *TCPUserRoutine) Run() {
 
 				// reply the questions
 				reply := msg.NewDNSMessageReply(message.Header.ID, message.Header.Flags, message.Question)
+				// fmt.Println("Find redis cache")
 				if mredis.FindCache(reply, conn) {
 					// reply.Print()
 					b, err := reply.CompressToBytes()
@@ -170,6 +173,7 @@ func (rt *TCPUserRoutine) Run() {
 						break
 					}
 
+					//-------------------------------------
 					tcpConn.SetDeadline(time.Now().Add(rt.tcpTimeout))
 
 					var lenb = uint16(len(b))
@@ -185,7 +189,7 @@ func (rt *TCPUserRoutine) Run() {
 						rt.logger.Errorf("write to client error: %v", err)
 						goto reset_and_reaccept_new_link
 					}
-
+					// ------------------------------------
 					rt.logger.Infof("using redis cache reply to address: %v, %v", message.Header.ID, tcpConn.RemoteAddr())
 				} else {
 					// send message to quest remote server
@@ -216,7 +220,7 @@ func (rt *TCPUserRoutine) Run() {
 					rt.dispatcher.messageChan <- buf
 					select {
 					case buf = <-rt.MessageChan:
-					case <-time.After(time.Second * 10):
+					case <-time.After(time.Second * 5):
 						//todo: reply...
 						rt.logger.Errorf("timeout: routine name, %v", rt.tid)
 						goto reset_and_reaccept_new_link
@@ -273,6 +277,7 @@ func (rt *TCPUserRoutine) Run() {
 			}
 			continue
 		reset_and_reaccept_new_link:
+			fmt.Println("reset and reaccept")
 			tcpConn.Close()
 			conn.Close()
 		}

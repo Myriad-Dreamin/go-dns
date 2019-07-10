@@ -104,9 +104,18 @@ func (rt *TCPRemoteServerRoutine) Run() {
 			}
 			rt.bufferPool.Put(bmsg)
 		default:
+
 			rt.remoteTCPConn.SetReadDeadline(time.Now().Add(1 * time.Second))
 			_, err := rt.remoteTCPConn.Read(b)
 			if err != nil {
+				if err == io.EOF {
+					if err = rt.tryReDial(); err != nil {
+						rt.logger.Errorf("redial failed, error: %v", err)
+						return
+					} else {
+						continue
+					}
+				}
 				if er, ok := err.(net.Error); !ok {
 					rt.logger.Errorf("failed when reading message, error: %v", err)
 				} else if er.Timeout() {
@@ -148,11 +157,14 @@ func (rt *TCPRemoteServerRoutine) Run() {
 						}
 
 						rt.dispatcher.tcpUserRoutine[tid].MessageChan <- bb
+
 					} else {
 						break
 					}
 				} else if rt.Buffer.Len() > 1 {
 					binary.Read(rt.Buffer, binary.BigEndian, &rt.readNumber)
+				} else {
+					break
 				}
 			}
 			if rt.Buffer.Cap() < 600 {
@@ -168,6 +180,7 @@ func (rt *TCPRemoteServerRoutine) Run() {
 					rt.Buffer = t
 				}
 			}
+
 			// case idx := <-srv.TCPRoutineLimit:
 			// 	go srv.ServeTCPFromOut(idx, srv.TCPBuffer[idx-UDPRange])
 			// case idx := <-srv.TCPWriteRoutineLimit:
