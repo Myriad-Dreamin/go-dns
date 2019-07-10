@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"regexp"
 
 	config "github.com/Myriad-Dreamin/go-dns/config"
@@ -215,8 +216,21 @@ func Process(filePath string) (HostMapping, HostMapping, error) {
 
 func init() {
 	var err error
-	HostsIPv4, HostsIPv6, err = Process(config.Hostsfile)
+
+	hostspath := config.Config().HostsConfig.HostsPath
+	if config.Config().HostsConfig.RelativePath {
+		hostspath, err = filepath.Abs(hostspath)
+	}
+
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
+		return
+	}
+
+	// HostsIPv4, HostsIPv6, err = Process(config.Hostsfile)
+	HostsIPv4, HostsIPv6, err = Process(hostspath)
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 }
