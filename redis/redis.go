@@ -56,8 +56,7 @@ func AuthorityToRedis(que msg.DNSQuestion, answers []msg.DNSAnswer, conn redis.C
 		// conn.Do("set", key, b, "EX", ans.TTL)
 		switch ans.Type {
 		case rtype.SOA:
-			// conn.Send("set", key, b, "EX", ans.RDData.(*msg.SOA).MinimumTTL)
-			conn.Send("set", key, b, "EX", ans.TTL)
+			conn.Send("set", key, b, "EX", ans.RDData.(*msg.SOA).MinimumTTL)
 			cnt += 1
 		default:
 			return 0, errors.New("Type it not suppoted by redis")
@@ -78,8 +77,7 @@ func AuthorityToRedis(que msg.DNSQuestion, answers []msg.DNSAnswer, conn redis.C
 			// conn.Do("set", key, b, "EX", ans.TTL)
 			switch ans.Type {
 			case rtype.SOA:
-				// conn.Send("set", key, b, "EX", ans.RDData.(*msg.SOA).MinimumTTL)
-				conn.Send("set", key, b, "EX", ans.TTL)
+				conn.Send("set", key, b, "EX", ans.RDData.(*msg.SOA).MinimumTTL)
 				cnt += 1
 			default:
 				return 0, errors.New("Type it not suppoted by redis")
@@ -127,7 +125,7 @@ func HasRecord(keys []string, prefix string) int {
 	return -1
 }
 
-func FindCache(m *msg.DNSMessage, conn redis.Conn) error {
+func FindCache(m *msg.DNSMessage, conn redis.Conn) bool {
 	var (
 		replyans msg.DNSAnswer
 		keys     []string
@@ -136,25 +134,28 @@ func FindCache(m *msg.DNSMessage, conn redis.Conn) error {
 	for _, que := range m.Question {
 		domain := string(que.Name)
 		searchkey := domain + ":" + msg.Typename[que.Type]
+		if err != nil {
+			return false
+		}
 		switch que.Type {
 		case qtype.A, qtype.AAAA, qtype.MX:
 			for { // Find CNAME
 				keys, err = redis.Strings(conn.Do("keys", domain+":CNAME:*"))
 				if len(keys) > 1 {
 					fmt.Print("Multiple CNAME error")
-					return errors.New("Multiple CNAME error")
+					return false
 				} else if len(keys) != 0 {
 					key := keys[0]
 					bs, err := redis.Bytes(conn.Do("get", key))
 					if err != nil {
-						return err
+						return false
 					}
 					replyans.ReadFrom(bs, 0)
 					m.InsertAnswer(replyans)
 					// searchkey, err = replyans.RedisKey()
 					bytesdomain, _, err := msg.GetStringFullName(replyans.RDData.([]byte), 0)
 					if err != nil {
-						return errors.New("Format Error")
+						return false
 					}
 					domain = string(bytesdomain)
 					searchkey = domain + ":" + msg.Typename[que.Type]
@@ -164,12 +165,12 @@ func FindCache(m *msg.DNSMessage, conn redis.Conn) error {
 			}
 			keys, err = redis.Strings(conn.Do("keys", searchkey+":*"))
 			if err != nil {
-				return err
+				return false
 			}
 			if len(keys) == 0 { // Find SOA
 				keys, err = redis.Strings(conn.Do("keys", domain+":SOA:"+msg.Typename[que.Type]+":*"))
 				if len(keys) == 0 {
-					return err
+					return false
 				} else {
 					return InsertAuthority(m, keys, conn)
 				}
@@ -179,19 +180,19 @@ func FindCache(m *msg.DNSMessage, conn redis.Conn) error {
 		case qtype.NS, qtype.CNAME:
 			keys, err := redis.Strings(conn.Do("keys", searchkey+":*"))
 			if err != nil {
-				return err
+				return false
 			}
 			return InsertAnswer(m, keys, conn)
 		default:
-			return err
+			return false
 		}
 	}
-	return nil
+	return true
 }
 
-func InsertAnswer(m *msg.DNSMessage, keys []string, conn redis.Conn) error {
+func InsertAnswer(m *msg.DNSMessage, keys []string, conn redis.Conn) bool {
 	if len(keys) == 0 {
-		return errors.New("no redis cache")
+		return false
 	}
 	var replyans msg.DNSAnswer
 	for _, k := range keys {
@@ -203,18 +204,18 @@ func InsertAnswer(m *msg.DNSMessage, keys []string, conn redis.Conn) error {
 		res, err := conn.Receive()
 		ttl, err := conn.Receive()
 		if err != nil {
-			return err
+			return false
 		}
 		replyans.ReadFrom(res.([]byte), 0)
 		replyans.SetTTL(uint32(ttl.(int64)))
 		m.InsertAnswer(replyans)
 	}
-	return nil
+	return true
 }
 
-func InsertAuthority(m *msg.DNSMessage, keys []string, conn redis.Conn) error {
+func InsertAuthority(m *msg.DNSMessage, keys []string, conn redis.Conn) bool {
 	if len(keys) == 0 {
-		return errors.New("no redis cache")
+		return false
 	}
 	var replyans msg.DNSAnswer
 	for _, k := range keys {
@@ -226,11 +227,11 @@ func InsertAuthority(m *msg.DNSMessage, keys []string, conn redis.Conn) error {
 		res, err := conn.Receive()
 		ttl, err := conn.Receive()
 		if err != nil {
-			return err
+			return false
 		}
 		replyans.ReadFrom(res.([]byte), 0)
 		replyans.SetTTL(uint32(ttl.(int64)))
 		m.InsertAuthority(replyans)
 	}
-	return nil
+	return true
 }

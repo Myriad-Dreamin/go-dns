@@ -57,13 +57,13 @@ func GetFullName(bs []byte, offset int) ([]byte, int, error) {
 	var cnt int
 	for k := 0; k < 1<<10; k++ {
 		if offset < 0 || offset >= len(bs) {
-			return nil, 0, errors.New("Index out of range")
+			return nil, 0, errors.New("Format error when en/decoding: index out of range")
 		}
 		for i := offset; ; i++ {
 			n = int(bs[i])
 			if n&0xc0 == 0xc0 {
 				if i+1 >= len(bs) {
-					return nil, 0, errors.New("Index out of range")
+					return nil, 0, errors.New("Format error when en/decoding: index out of range")
 				}
 				offset = n&0x3f<<8 + int(bs[i+1])
 				if k == 0 {
@@ -79,7 +79,7 @@ func GetFullName(bs []byte, offset int) ([]byte, int, error) {
 					return buf.Bytes(), cnt, nil
 				}
 				if i+n+1 >= len(bs) {
-					return nil, 0, errors.New("Index out of range")
+					return nil, 0, errors.New("Format error when en/decoding: index out of range")
 				}
 				for j := 0; j < n; j++ {
 					buf.WriteByte(bs[i+1+j])
@@ -97,13 +97,13 @@ func GetStringFullName(bs []byte, offset int) ([]byte, int, error) {
 	var cnt int
 	for k := 0; k < 1<<10; k++ {
 		if offset < 0 || offset >= len(bs) {
-			return nil, 0, errors.New("Index out of range")
+			return nil, 0, errors.New("Format error when en/decoding: index out of range")
 		}
 		for i := offset; ; i++ {
 			n = int(bs[i])
 			if n&0xc0 == 0xc0 {
 				if i+1 >= len(bs) {
-					return nil, 0, errors.New("Index out of range")
+					return nil, 0, errors.New("Format error when en/decoding: index out of range")
 				}
 				offset = n&0x3f<<8 + int(bs[i+1])
 				if k == 0 {
@@ -124,7 +124,7 @@ func GetStringFullName(bs []byte, offset int) ([]byte, int, error) {
 					buf.WriteByte(byte('.'))
 				}
 				if i+n+1 >= len(bs) {
-					return nil, 0, errors.New("Index out of range")
+					return nil, 0, errors.New("Format error when en/decoding: index out of range")
 				}
 				for j := 0; j < n; j++ {
 					buf.WriteByte(bs[i+1+j])

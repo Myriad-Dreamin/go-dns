@@ -37,13 +37,13 @@ const (
 )
 
 const (
-	RCodeOffset uint16 = 1 << offset.RCode
-	NoError     uint16 = iota << offset.RCode
+	NoError uint16 = iota << offset.RCode
 	FormatError
 	ServerFailure
 	NameError
 	NotImplemented
 	Refused
+	RCodeOffset uint16 = 1 << offset.RCode
 )
 
 func HasNoError(flags uint16) bool {
