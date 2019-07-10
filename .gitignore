@@ -2,4 +2,6 @@
 go.mod
 go.sum
 *.exe
+./bin/cli/config.toml
+./bin/cli/hosts
 bin/config.toml
