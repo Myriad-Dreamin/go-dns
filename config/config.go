@@ -17,8 +17,13 @@ var (
 		ServerNetworkType: "udp4",
 		RemoteServerAddr:  "223.5.5.5",
 	}
+	defaultHostsConfig = HostsConfig{
+		RelativePath: true,
+		HostsPath:    "./hosts",
+	}
 	defaultConfig = &Configuration{
 		defaultServerConfig,
+		defaultHostsConfig,
 	}
 	cfg         *Configuration
 	cfgContext  string = "config.toml"
@@ -29,6 +34,7 @@ var (
 
 type Configuration struct {
 	ServerConfig ServerConfig `toml:"server"`
+	HostsConfig  HostsConfig  `toml:"hosts"`
 }
 
 type ServerConfig struct {
@@ -38,6 +44,11 @@ type ServerConfig struct {
 	TCPBUfferSize     uint16 `toml:"tcp_buffer_size"`
 	ServerNetworkType string `toml:"server_network_type"`
 	RemoteServerAddr  string `toml:"default_remote_server_address"`
+}
+
+type HostsConfig struct {
+	RelativePath bool   `toml:"relative_path"`
+	HostsPath    string `toml:"hosts_path"`
 }
 
 func Config() *Configuration {
