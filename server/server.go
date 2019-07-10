@@ -107,7 +107,7 @@ func (srv *Server) ListenAndServe(host string) (err error) {
 
 		srv.logger.Infof("all is ready for start udp server at %v", host)
 		srv.SetUpUDP <- true
-		srv.UDPDispatcher.Start(&srv.QuitUDP)
+		go srv.UDPDispatcher.Start(&srv.QuitUDP)
 	}()
 
 	go func() {

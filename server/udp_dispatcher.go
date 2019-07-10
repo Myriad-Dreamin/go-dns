@@ -7,6 +7,7 @@ import (
 
 	hosts "github.com/Myriad-Dreamin/go-dns/hosts"
 	msg "github.com/Myriad-Dreamin/go-dns/msg"
+	DNSFlags "github.com/Myriad-Dreamin/go-dns/msg/flags"
 	qtype "github.com/Myriad-Dreamin/go-dns/msg/rec/qtype"
 	mredis "github.com/Myriad-Dreamin/go-dns/redis"
 	log "github.com/sirupsen/logrus"
@@ -180,29 +181,23 @@ func (udpDispatcher *UDPDispatcher) ReleaseUDPReadRoutine(tid uint16) {
 }
 
 func (udpDispatcher *UDPDispatcher) ServeUDPReadFromOut(tid uint16, b []byte) {
-	udpDispatcher.remoteUDPConn.SetReadDeadline(time.Now().Add(1 * time.Second))
 	for {
 		if udpDispatcher.closing {
 			udpDispatcher.ReleaseUDPReadRoutine(tid)
 			return
 		}
+		udpDispatcher.remoteUDPConn.SetReadDeadline(time.Now().Add(1 * time.Second))
 		_, err := udpDispatcher.remoteUDPConn.Read(b)
+
 		// udpDispatcher.udpDispatcherMutex.Lock()
 		// defer udpDispatcher.udpDispatcherMutex.Unlock()
 		if err != nil {
 			if er, ok := err.(net.Error); !ok {
 				udpDispatcher.logger.Errorf("read error: %v", err)
-				return
-			} else {
-				if udpDispatcher.closing {
-					udpDispatcher.ReleaseUDPReadRoutine(tid)
-					return
-				}
-				if er.Timeout() {
-					udpDispatcher.remoteUDPConn.SetReadDeadline(time.Now().Add(1 * time.Second))
-					continue
-				}
+			} else if !er.Timeout() {
+				udpDispatcher.logger.Errorf("read net error: %v", err)
 			}
+			continue
 		}
 		// fast extract id from message
 		udpDispatcher.UDPReadBytesChan[(uint16(b[0])<<8)+uint16(b[1])] <- tid
@@ -210,32 +205,36 @@ func (udpDispatcher *UDPDispatcher) ServeUDPReadFromOut(tid uint16, b []byte) {
 	}
 }
 
+func (udpDispatcher *UDPDispatcher) ReplyFormatError(header msg.DNSHeader, servingAddr *net.UDPAddr) {
+	b := header.ToBytes()
+	_, err := udpDispatcher.connUDP.WriteToUDP(b, servingAddr)
+	if err != nil {
+		udpDispatcher.logger.Errorf("write to client error: %v", err)
+		return
+	}
+}
+
 func (udpDispatcher *UDPDispatcher) ServeUDPFromOut(tid uint16, b []byte) {
 	defer udpDispatcher.ReleaseUDPRoutine(tid)
-	udpDispatcher.connUDP.SetReadDeadline(time.Now().Add(1 * time.Second))
 	for {
 
 		for len(udpDispatcher.UDPReadBytesChan[tid]) > 0 {
-			<-udpDispatcher.UDPReadBytesChan[tid]
+			udpDispatcher.ReleaseUDPReadRoutine(<-udpDispatcher.UDPReadBytesChan[tid])
 			fmt.Println("QAQ")
 		}
 		if udpDispatcher.closing {
 			return
 		}
+		udpDispatcher.connUDP.SetReadDeadline(time.Now().Add(1 * time.Second))
 		_, servingAddr, err := udpDispatcher.connUDP.ReadFromUDP(b)
+
 		if err != nil {
 			if er, ok := err.(net.Error); !ok {
 				udpDispatcher.logger.Errorf("failed when reading udp msg, error: %v", err)
-				return
-			} else {
-				if udpDispatcher.closing {
-					return
-				}
-				if er.Timeout() {
-					udpDispatcher.connUDP.SetReadDeadline(time.Now().Add(1 * time.Second))
-					continue
-				}
+			} else if !er.Timeout() {
+				udpDispatcher.logger.Errorf("net failed when reading udp msg, error: %v", err)
 			}
+			continue
 		}
 		udpDispatcher.connUDP.SetReadDeadline(time.Now().Add(1 * time.Second))
 
@@ -243,12 +242,19 @@ func (udpDispatcher *UDPDispatcher) ServeUDPFromOut(tid uint16, b []byte) {
 		_, err = message.Read(b)
 		if err != nil {
 			udpDispatcher.logger.Errorf("failed when decoding udp msg, error: %v", err)
+			var header msg.DNSHeader
+			_, err := header.Read(b)
+			if err == nil {
+				udpDispatcher.ReplyFormatError(header, servingAddr)
+			}
+			// can't decode the information of the client, ignore this query
+			// TODO: udpDispatcher.connUDP.WriteToUDP(formatError, servingAddr)
 			return
 		}
 
 		udpDispatcher.logger.Infof("new message incoming: id, address: %v, %v", message.Header.ID, servingAddr)
+		// if message.Header.Flags
 		reply := msg.NewDNSMessageReply(message.Header.ID, message.Header.Flags, message.Question)
-
 		if message.Question[0].Type == qtype.A || message.Question[0].Type == qtype.AAAA {
 			var (
 				ipaddr net.IP
@@ -268,7 +274,8 @@ func (udpDispatcher *UDPDispatcher) ServeUDPFromOut(tid uint16, b []byte) {
 				reply.InsertAnswer(*replyans)
 				b, err := reply.CompressToBytes()
 				if err != nil {
-					udpDispatcher.logger.Errorf("get redis cache error: %v", err)
+					udpDispatcher.logger.Errorf("get hosts error: %v", err)
+					udpDispatcher.ReplyFormatError(message.Header, servingAddr)
 					return
 				}
 				_, err = udpDispatcher.connUDP.WriteToUDP(b, servingAddr)
@@ -284,74 +291,83 @@ func (udpDispatcher *UDPDispatcher) ServeUDPFromOut(tid uint16, b []byte) {
 
 		conn := mredis.RedisCacheClient.Pool.Get()
 		defer conn.Close()
-		if mredis.FindCache(reply, conn) {
-			// reply.Print()
-			b, err := reply.CompressToBytes()
+
+		// RD is directly sent to remote server
+		if DNSFlags.HasQuery(message.Header.Flags) {
+			err = mredis.FindCache(reply, conn)
 			if err != nil {
-				udpDispatcher.logger.Errorf("get redis cache error: %v", err)
+				// repl1y.Print()
+				b, err := reply.CompressToBytes()
+				if err != nil {
+					udpDispatcher.logger.Errorf("get redis cache error: %v", err)
+					udpDispatcher.ReplyFormatError(message.Header, servingAddr)
+					return
+				}
+				_, err = udpDispatcher.connUDP.WriteToUDP(b, servingAddr)
+				if err != nil {
+					udpDispatcher.logger.Errorf("write to client error: %v", err)
+					return
+				}
+
+				udpDispatcher.logger.Infof("using redis cache reply to address: %v, %v", message.Header.ID, servingAddr)
 				return
 			}
-			_, err = udpDispatcher.connUDP.WriteToUDP(b, servingAddr)
-			if err != nil {
-				udpDispatcher.logger.Errorf("write to client error: %v", err)
-				return
-			}
-
-			udpDispatcher.logger.Infof("using redis cache reply to address: %v, %v", message.Header.ID, servingAddr)
-			return
-		} else {
-			fid := message.Header.ID
-			message.Header.ID = tid
-			b, err = message.CompressToBytes()
-			// b[0] = byte(tid >> 8)
-			// b[1] = byte(tid & 0xff)
-			if err != nil {
-				udpDispatcher.logger.Errorf("convert error: %v", err)
-				return
-			}
-
-			if _, err := udpDispatcher.remoteUDPConn.Write(b); err != nil {
-				udpDispatcher.logger.Errorf("write error: %v", err)
-				return
-			}
-
-			select {
-			case rid := <-udpDispatcher.UDPReadBytesChan[tid]:
-				defer udpDispatcher.ReleaseUDPReadRoutine(rid)
-				b = udpDispatcher.UDPReadBuffer[rid]
-			case <-time.After(time.Second * 1):
-				//todo: reply...
-			}
-
-			_, err = message.Read(b)
-			if err != nil {
-				udpDispatcher.logger.Errorf("read error: %v", err)
-				return
-			}
-			// if tid != message.Header.ID {
-			// 	udpDispatcher.logger.Errorf("not matching..., serving %v", servingAddr)
-			// }
-			// message.Print()
-			message.Header.ID = fid
-
-			mredis.MessageToRedis(message, conn)
-
-			b, err = message.CompressToBytes()
-
-			// b[0] = byte(fid >> 8)
-			// b[1] = byte(fid & 0xff)
-			if err != nil {
-				udpDispatcher.logger.Errorf("convert error: %v", err)
-				return
-			}
-			_, err = udpDispatcher.connUDP.WriteToUDP(b, servingAddr)
-			if err != nil {
-				udpDispatcher.logger.Errorf("write to client error: %v", err)
-				return
-			}
-
-			udpDispatcher.logger.Infof("reply to address: %v, %v", message.Header.ID, servingAddr)
+		}
+		fid := message.Header.ID
+		message.Header.ID = tid
+		b, err = message.CompressToBytes()
+		// b[0] = byte(tid >> 8)
+		// b[1] = byte(tid & 0xff)
+		if err != nil {
+			udpDispatcher.logger.Errorf("convert error: %v", err)
+			udpDispatcher.ReplyFormatError(message.Header, servingAddr)
 			return
 		}
+
+		if _, err := udpDispatcher.remoteUDPConn.Write(b); err != nil {
+			udpDispatcher.logger.Errorf("write error: %v", err)
+			return
+		}
+
+		select {
+		case rid := <-udpDispatcher.UDPReadBytesChan[tid]:
+			defer udpDispatcher.ReleaseUDPReadRoutine(rid)
+			b = udpDispatcher.UDPReadBuffer[rid]
+		case <-time.After(time.Second * 1):
+			return
+			//todo: reply...
+		}
+
+		_, err = message.Read(b)
+		if err != nil {
+			udpDispatcher.logger.Errorf("read error: %v", err)
+			return
+		}
+		// if tid != message.Header.ID {
+		// 	udpDispatcher.logger.Errorf("not matching..., serving %v", servingAddr)
+		// }
+		// message.Print()
+		message.Header.ID = fid
+
+		mredis.MessageToRedis(message, conn)
+
+		b, err = message.CompressToBytes()
+
+		// b[0] = byte(fid >> 8)
+		// b[1] = byte(fid & 0xff)
+		if err != nil {
+			udpDispatcher.logger.Errorf("remote dns convert error: %v", err)
+			udpDispatcher.ReplyFormatError(message.Header, servingAddr)
+			return
+		}
+		_, err = udpDispatcher.connUDP.WriteToUDP(b, servingAddr)
+		if err != nil {
+			udpDispatcher.logger.Errorf("write to client error: %v", err)
+			return
+		}
+
+		udpDispatcher.logger.Infof("reply to address: %v, %v", message.Header.ID, servingAddr)
+		return
 	}
+
 }

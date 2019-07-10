@@ -53,7 +53,7 @@ func NewServerCmd(dnsSrv *ServerX) *ServerCmd {
 		Flags: []urcli.Flag{
 			urcli.StringFlag{
 				Name:        "host",
-				Value:       "223.5.5.5",
+				Value:       "114.114.114.114",
 				Usage:       "parent dns address",
 				Destination: &serve.host,
 			},
