@@ -1,5 +1,13 @@
 package msg
 
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+
+	mdnet "github.com/Myriad-Dreamin/go-dns/net"
+)
+
 /*
                                         1  1  1  1  1  1
           0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
@@ -110,14 +118,6 @@ NSCOUNT         an unsigned 16 bit integer specifying the number of name
 ARCOUNT         an unsigned 16 bit integer specifying the number of
                 resource records in the additional records section.
 */
-import (
-	"bytes"
-	"encoding/binary"
-	"fmt"
-
-	mdnet "github.com/Myriad-Dreamin/go-dns/net"
-)
-
 type DNSHeader struct {
 	ID      uint16
 	Flags   uint16

@@ -1,7 +1,6 @@
 package dnssrv
 
 import (
-	"fmt"
 	"net"
 	"time"
 
@@ -169,20 +168,20 @@ func (udpDispatcher *UDPDispatcher) Stop() (err error) {
 			select {
 			case <-udpDispatcher.UDPRoutineLimit:
 				aa++
-				fmt.Println("UDPRoutineLimit", i, aa)
+				// fmt.Println("UDPRoutineLimit", i, aa)
 			}
-			qwq <- true
 		}
+		qwq <- true
 	}()
 	go func() {
 		for i := udpDispatcher.maxRoutineCount; i > 0; i-- {
 			select {
 			case <-udpDispatcher.UDPReadRoutineLimit:
 				bb++
-				fmt.Println("UDPReadRoutineLimit", i, bb)
+				// fmt.Println("UDPReadRoutineLimit", i, bb)
 			}
-			qwq <- true
 		}
+		qwq <- true
 	}()
 	<-qwq
 	<-qwq
@@ -288,7 +287,7 @@ func (udpDispatcher *UDPDispatcher) serveUDPFromOut(idx int64, tid uint16) {
 
 		for len(udpDispatcher.UDPReadBytesChan[idx]) > 0 {
 			udpDispatcher.bytesPool.Put(<-udpDispatcher.UDPReadBytesChan[idx])
-			fmt.Println("QAQ")
+			// fmt.Println("QAQ")
 		}
 		if udpDispatcher.closing {
 			return

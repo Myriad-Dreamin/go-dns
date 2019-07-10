@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"os"
@@ -15,11 +14,14 @@ import (
 )
 
 var (
-	HostsIPv4      map[string]net.IP
-	HostsIPv6      map[string]net.IP
 	errTooMuchItem = errors.New("too much item in a line")
 	errIPFormat    = errors.New("bad format of ip")
 	errFQDNFormat  = errors.New("bad format of domain name")
+)
+
+var (
+	HostsIPv4 map[string]net.IP
+	HostsIPv6 map[string]net.IP
 )
 
 type HostMapping = map[string]net.IP
@@ -73,7 +75,6 @@ in golang:
 
 var (
 	testipv4 = "^(" + test0to255 + "\\." + test0to255 + "\\." + test0to255 + "\\." + test0to255 + ")$"
-	testipv  = "^(" + test0to255 + ")$"
 	regFQDN  = regexp.MustCompile("^(([0-9A-Za-z](()|([-0-9A-Za-z]{0,61}[0-9A-Za-z])))|((([0-9A-Za-z](()|([-0-9A-Za-z]{0,61}[0-9A-Za-z]))\\.)*)([0-9A-Za-z](()|([-0-9A-Za-z]{0,60}[0-9A-Za-z])))))$")
 	regIP    = regexp.MustCompile(testipv4)
 	// rega    = regexp.MustCompile(test63NRegExp)
@@ -105,6 +106,7 @@ func testFQDN(fqdn []byte) bool {
 
 // func ToIPv4Bytes(net.I)
 
+// process any file to ipv4 & ipv6 map
 func Process(filePath string) (HostMapping, HostMapping, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
@@ -180,7 +182,7 @@ func Process(filePath string) (HostMapping, HostMapping, error) {
 		sp = findChar(line, ' ')
 		ipBytes, line = line[0:sp], bytes.TrimSpace(line[sp:])
 		if mip = toIP(ipBytes); mip == nil {
-			fmt.Println(string(ipBytes))
+			// fmt.Println(string(ipBytes))
 			return nil, nil, errIPFormat
 		}
 		if len(line) == 0 {
@@ -214,23 +216,19 @@ func Process(filePath string) (HostMapping, HostMapping, error) {
 	return ret4, ret6, err
 }
 
-func init() {
+// read hosts files to map
+func LoadHosts() error {
 	var err error
 
 	hostspath := config.Config().HostsConfig.HostsPath
 	if config.Config().HostsConfig.RelativePath {
 		hostspath, err = filepath.Abs(hostspath)
 	}
-
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
 
 	// HostsIPv4, HostsIPv6, err = Process(config.Hostsfile)
 	HostsIPv4, HostsIPv6, err = Process(hostspath)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	return err
 }

@@ -53,7 +53,7 @@ func (rt *TCPUserRoutine) Run() {
 		select {
 		case <-rt.QuitRequest:
 			rt.quit <- true
-			fmt.Println("TCPUserRoutine")
+			// fmt.Println("TCPUserRoutine")
 			return
 		default:
 			var tcpConn *net.TCPConn
@@ -107,8 +107,8 @@ func (rt *TCPUserRoutine) Run() {
 						rt.readNumber = 0
 						break
 					}
-					fmt.Println(rt.tid, "buffer cap", len(b), rt.Buffer.Cap())
-					fmt.Println("?", rt.readNumber, b[0:n])
+					// fmt.Println(rt.tid, "buffer cap", len(b), rt.Buffer.Cap())
+					// fmt.Println("?", rt.readNumber, b[0:n])
 					if n == 0 {
 						continue
 					}
@@ -140,7 +140,7 @@ func (rt *TCPUserRoutine) Run() {
 					}
 				}
 
-				fmt.Println("receive message :\n", rt.tid)
+				// fmt.Println("receive message :\n", rt.tid)
 
 				// read bad message
 				if rt.readNumber == 0 {
@@ -177,7 +177,7 @@ func (rt *TCPUserRoutine) Run() {
 					tcpConn.SetDeadline(time.Now().Add(rt.tcpTimeout))
 
 					var lenb = uint16(len(b))
-					fmt.Println(lenb, b)
+					//	fmt.Println(lenb, b)
 					err = binary.Write(tcpConn, binary.BigEndian, &lenb)
 					if err != nil {
 						rt.logger.Errorf("write to client error: %v", err)
@@ -253,7 +253,7 @@ func (rt *TCPUserRoutine) Run() {
 					tcpConn.SetDeadline(time.Now().Add(rt.tcpTimeout))
 
 					var lenb = uint16(len(b))
-					fmt.Println(lenb, b)
+					// fmt.Println(lenb, b)
 					err = binary.Write(tcpConn, binary.BigEndian, &lenb)
 					if err != nil {
 						rt.logger.Errorf("write to client error: %v", err)

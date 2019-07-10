@@ -3,7 +3,6 @@ package dnssrv
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"net"
 	"time"
@@ -87,10 +86,10 @@ func (rt *TCPRemoteServerRoutine) Run() {
 		select {
 		case <-rt.QuitRequest:
 			rt.quit <- true
-			fmt.Println("TCPRemoteServerRoutine")
+			// fmt.Println("TCPRemoteServerRoutine")
 			return
 		case bmsg := <-rt.MessageChan:
-			fmt.Println("ready to write")
+			// fmt.Println("ready to write")
 			rt.remoteTCPConn.SetWriteDeadline(time.Now().Add(1 * time.Second))
 			err := binary.Write(rt.remoteTCPConn, binary.BigEndian, uint16(bmsg.Len()))
 			if err != nil {
@@ -149,7 +148,7 @@ func (rt *TCPRemoteServerRoutine) Run() {
 						binary.Write(bb, binary.BigEndian, &tid)
 						_, err := io.TeeReader(io.LimitReader(rt.Buffer, int64(rt.readNumber-2)), bb).Read(b)
 
-						fmt.Println("getting...", tid, bb)
+						// fmt.Println("getting...", tid, bb)
 						rt.readNumber = 0
 						if err != nil {
 							rt.logger.Errorf("trans buffering error: %v", err)

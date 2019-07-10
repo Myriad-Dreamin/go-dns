@@ -1,3 +1,4 @@
+
 # go-dns toml sample
 
 ###################
@@ -11,22 +12,36 @@
 
 # 设定当前的服务器网络类型，默认为UDP ipv4
 # server_network_type = "udp4"
+
 # 设定默认的主（上游）DNS服务器
 # default_remote_server_address = "223.5.5.5"
+
+# 设定默认的监听地址
+# 127.0.0.1:53, 允许本地连接
+# 0.0.0.0:53, 允许远程连接
+# default_local_server_address = "127.0.0.1:53"
 
 
 # udp_range和tcp_range的和不能超过65536，因为关乎同时启用的线程个数，应当适量设定
 # udp_range代表同时服务的最大UDP连接数
 # udp_range = 200
+
 # udp_buffer_size代表服务器允许的最大DNS包长度
 # udp_buffer_size = 520
 
 # tcp_range代表同时服务的最大TCP连接数
 # tcp_range = 10
-# tcp_buffer_size代表服务器允许的最大DNS包长度
-# tcp_buffer_size = 50000
 
-[host]
+# tcp_buffer_size代表服务器允许的最大DNS包长度
+# 在传统以太网上设置超过1500的值是没有意义的
+# tcp_buffer_size = 65536
+
+# tcp_server_timeout代表允许客户端无响应的最长时间
+# tcp_server_timeout = 10
+# unit支持的单位有s(秒), min(分)
+# tcp_server_timeout_unit = "s"
+
+[hosts]
 
 # relative_path = true
 # dir = "./hosts"

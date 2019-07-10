@@ -35,13 +35,13 @@ const (
 	// with the host, although it is typically a strong hint.  For example,
 	// hosts which are name servers for either Internet (IN) or Hesiod (HS)
 	// class information are normally queried using IN class protocols.
-
 	// 2 0x2
 	NS
 
 	// Obsolete
 	// 3 0x3
 	MD
+
 	// Obsolete
 	// 4 0x4
 	MF
@@ -62,7 +62,6 @@ const (
 	// CNAME RRs cause no additional section processing, but name servers may
 	// choose to restart the query at the canonical name in certain cases.  See
 	// the description of name server logic in [RFC-1034] for details.
-
 	// 5 0x5
 	CNAME
 
@@ -130,7 +129,6 @@ const (
 	// when the zone is loaded from a master file or via a zone transfer.  The
 	// reason for this provison is to allow future dynamic update facilities to
 	// change the SOA RR with known semantics.
-
 	// 6 0x6
 	SOA
 
@@ -148,7 +146,6 @@ const (
 	//
 	// MB records cause additional section processing which looks up an A type
 	// RRs corresponding to MADNAME.
-
 	// 7 0x7
 	MB
 
@@ -165,7 +162,6 @@ const (
 	//                 member of the mail group specified by the domain name.
 	//
 	// MG records cause no additional section processing.
-
 	// 8 0x8
 	MG
 
@@ -184,7 +180,6 @@ const (
 	// MR records cause no additional section processing.  The main use for MR
 	// is as a forwarding entry for a user who has moved to a different
 	// mailbox.
-
 	// 9 0x9
 	MR
 
@@ -192,7 +187,6 @@ const (
 	// NULL records cause no additional section processing.  NULL RRs are not
 	// allowed in master files.  NULLs are used as placeholders in some
 	// experimental extensions of the DNS.
-
 	// 10 0xa
 	NULL
 
@@ -257,7 +251,6 @@ const (
 	// These records are simple data, and don't imply any special processing
 	// similar to that performed by CNAME, which identifies aliases.  See the
 	// description of the IN-ADDR.ARPA domain for an example.
-
 	// 12 0xc
 	PTR
 
@@ -281,7 +274,6 @@ const (
 	// HINFO records are used to acquire general information about a host.  The
 	// main use is for protocols such as FTP that can use special procedures
 	// when talking between machines or operating systems of the same type.
-
 	// 13 0xd
 	HINFO
 
@@ -314,7 +306,6 @@ const (
 	// MINFO records cause no additional section processing.  Although these
 	// records can be associated with a simple mailbox, they are usually used
 	// with a mailing list.
-
 	// 14 0xe
 	MINFO
 
@@ -339,7 +330,6 @@ const (
 	// MX records cause type A additional section processing for the host
 	// specified by EXCHANGE.  The use of MX RRs is explained in detail in
 	// [RFC-974].
-
 	// 15 0xf
 	MX
 
@@ -355,7 +345,6 @@ const (
 	//
 	// TXT RRs are used to hold descriptive text.  The semantics of the text
 	// depends on the domain where it is found.
-
 	// 16 0x10
 	TXT
 
