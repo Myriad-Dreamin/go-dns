@@ -25,3 +25,11 @@
 # tcp_range = 10
 # tcp_buffer_size代表服务器允许的最大DNS包长度
 # tcp_buffer_size = 50000
+
+[host]
+
+# relative_path = true
+# dir = "./hosts"
+
+# relative_path = false
+# dir = "E:/project/go/src/github.com/Myriad-Dreamin/go-dns/bin/hosts"

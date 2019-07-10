@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	config "github.com/Myriad-Dreamin/go-dns/config"
 	dnsrv "github.com/Myriad-Dreamin/go-dns/server"
 	log "github.com/sirupsen/logrus"
 	urcli "github.com/urfave/cli"
@@ -42,6 +43,7 @@ func convertPortFromInt(port int) (string, error) {
 func (cmd *ServerStartCmd) Action(c *urcli.Context) error {
 	var dnsServer = new(dnsrv.Server)
 	dnsServer.SetLogger(cmd.RequestRootLogger())
+	dnsServer.SetConfig(config.Config())
 
 	if err := dnsServer.ListenAndServe(cmd.parentCmd.host); err != nil {
 		return err

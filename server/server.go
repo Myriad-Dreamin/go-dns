@@ -10,22 +10,23 @@ import (
 	"time"
 
 	// "github.com/garyburd/redigo/redis"
+	"github.com/Myriad-Dreamin/go-dns/config"
 	mdnet "github.com/Myriad-Dreamin/go-dns/net"
 	log "github.com/sirupsen/logrus"
 )
 
 const (
-	UDPRange = int64(1000)
+// UDPRange = int64(1000)
 
-	// EDNS > 512, DNS <= 512
-	UDPBufferSize = 520
-	TCPRange      = uint16(5)
-	TCPBufferSize = 65000
-	TCPTimeout    = 10 * time.Second
-	// serverAddr    = "0.0.0.0:53"
-	// serverAddr = "192.168.42.9:53"
-	// serverAddr = "127.0.0.1:53"
-	serverAddr = "0.0.0.0:53"
+// EDNS > 512, DNS <= 512
+// UDPBufferSize = 520
+// TCPRange      = uint16(5)
+// TCPBufferSize = 65000
+// TCPTimeout    = 10 * time.Second
+// serverAddr    = "0.0.0.0:53"
+// serverAddr = "192.168.42.9:53"
+// serverAddr = "127.0.0.1:53"
+// serverAddr = "0.0.0.0:53"
 )
 
 type Server struct {
@@ -44,7 +45,8 @@ type Server struct {
 	QuitTCP       chan bool
 	SetUpTCP      chan bool
 
-	quit chan bool
+	quit   chan bool
+	config *config.Configuration
 }
 
 func (srv *Server) SetLogger(mLogger *log.Logger) {
@@ -79,9 +81,14 @@ func (h *handler) atExit() {
 	}
 }
 
-func (srv *Server) ListenAndServe(host string) (err error) {
+func (srv *Server) SetConfig(config *config.Configuration) {
+	srv.srvMutex.Lock()
+	defer srv.srvMutex.Unlock()
+	srv.config = config
+}
 
-	if uint32(UDPRange)+uint32(TCPRange) > uint32(65536) {
+func (srv *Server) ListenAndServe(host string) (err error) {
+	if uint32(srv.config.ServerConfig.UDPRange)+uint32(srv.config.ServerConfig.TCPRange) > uint32(65536) {
 		err = errors.New("limit size of link out of index")
 		srv.logger.Errorln(err)
 		return
@@ -154,13 +161,25 @@ func (srv *Server) ListenAndServe(host string) (err error) {
 	}
 }
 
+func parseTime(t int64, u string) time.Duration {
+	switch u {
+	case "s":
+		return time.Duration(t) * time.Second
+	case "min":
+		return time.Duration(t) * time.Minute
+	default:
+		return -1
+	}
+}
+
 func (srv *Server) setupTCPDispatcher() error {
 	srv.TCPDispatcher = NewTCPDispatcher(
 		srv.logger,
-		TCPBufferSize,
+		srv.config.ServerConfig.TCPBUfferSize,
 		0,
-		TCPRange,
-		TCPRange,
+		srv.config.ServerConfig.TCPRange,
+		srv.config.ServerConfig.TCPRange,
+		parseTime(srv.config.ServerConfig.TCPServerTimeout, srv.config.ServerConfig.TCPServerTimeoutUnit),
 	)
 	if srv.TCPDispatcher == nil {
 		srv.logger.Errorf("set up tcp dispatcher failed")
@@ -172,8 +191,8 @@ func (srv *Server) setupTCPDispatcher() error {
 func (srv *Server) setupUDPDispatcher() error {
 	srv.UDPDispatcher = NewUDPDispatcher(
 		srv.logger,
-		UDPBufferSize,
-		UDPRange,
+		srv.config.ServerConfig.UDPBufferSize,
+		srv.config.ServerConfig.UDPRange,
 	)
 	if srv.UDPDispatcher == nil {
 		srv.logger.Errorf("set up udp dispatcher failed")
@@ -193,7 +212,7 @@ func (srv *Server) prepareTCPDispatcher(host string) (err error) {
 		)
 		return err
 	}
-	return srv.TCPDispatcher.Prepare(network, addr)
+	return srv.TCPDispatcher.Prepare(srv.config.ServerConfig.LocalServerAddr, network, addr)
 }
 
 func (srv *Server) PrepareUDPDispatcher(host string) (err error) {
@@ -207,5 +226,5 @@ func (srv *Server) PrepareUDPDispatcher(host string) (err error) {
 		)
 		return
 	}
-	return srv.UDPDispatcher.Prepare(network, addr)
+	return srv.UDPDispatcher.Prepare(srv.config.ServerConfig.LocalServerAddr, network, addr)
 }

@@ -91,7 +91,7 @@ func (udpDispatcher *UDPDispatcher) tryDisonnectFromRemoteDNSServer(idx int64) e
 	return nil
 }
 
-func (udpDispatcher *UDPDispatcher) listenUDP() (err error) {
+func (udpDispatcher *UDPDispatcher) listenUDP(serverAddr string) (err error) {
 	var udpAddr *net.UDPAddr
 	udpAddr, err = net.ResolveUDPAddr("udp", serverAddr)
 	if err != nil {
@@ -106,7 +106,7 @@ func (udpDispatcher *UDPDispatcher) listenUDP() (err error) {
 	return
 }
 
-func (udpDispatcher *UDPDispatcher) Prepare(network string, host *net.UDPAddr) (err error) {
+func (udpDispatcher *UDPDispatcher) Prepare(serverAddr, network string, host *net.UDPAddr) (err error) {
 
 	// set up udp connection(dial test)
 	for idx := int64(0); idx < udpDispatcher.maxRoutineCount; idx++ {
@@ -119,7 +119,7 @@ func (udpDispatcher *UDPDispatcher) Prepare(network string, host *net.UDPAddr) (
 		}
 	}
 
-	err = udpDispatcher.listenUDP()
+	err = udpDispatcher.listenUDP(serverAddr)
 	if err != nil {
 		udpDispatcher.logger.Errorf("udp server set up failed, error: %v", err)
 		return

@@ -80,7 +80,7 @@ func (rt *TCPUserRoutine) Run() {
 			rt.dispatcher.connTCP.SetDeadline(time.Now().Add(1 * time.Second))
 
 			// preparing
-			tcpConn.SetDeadline(time.Now().Add(TCPTimeout))
+			tcpConn.SetDeadline(time.Now().Add(rt.tcpTimeout))
 			rt.Buffer.Reset()
 			var b, c []byte
 			b = rt.bytesPool.Get().([]byte)
@@ -97,7 +97,7 @@ func (rt *TCPUserRoutine) Run() {
 						break
 					}
 
-					tcpConn.SetDeadline(time.Now().Add(TCPTimeout))
+					tcpConn.SetDeadline(time.Now().Add(rt.tcpTimeout))
 					n, err = tcpConn.Read(b)
 					if err != nil {
 						if err != io.EOF {
@@ -112,7 +112,7 @@ func (rt *TCPUserRoutine) Run() {
 					if n == 0 {
 						continue
 					}
-					tcpConn.SetDeadline(time.Now().Add(TCPTimeout))
+					tcpConn.SetDeadline(time.Now().Add(rt.tcpTimeout))
 					_, err = rt.Buffer.Write(b[0:n])
 					if err != nil {
 						rt.logger.Errorf("buffering error: %v", err)
@@ -170,7 +170,7 @@ func (rt *TCPUserRoutine) Run() {
 						break
 					}
 
-					tcpConn.SetDeadline(time.Now().Add(TCPTimeout))
+					tcpConn.SetDeadline(time.Now().Add(rt.tcpTimeout))
 
 					var lenb = uint16(len(b))
 					fmt.Println(lenb, b)
@@ -205,7 +205,7 @@ func (rt *TCPUserRoutine) Run() {
 						goto reset_and_reaccept_new_link
 					}
 
-					tcpConn.SetDeadline(time.Now().Add(TCPTimeout))
+					tcpConn.SetDeadline(time.Now().Add(rt.tcpTimeout))
 
 					// clear message channel
 					for len(rt.MessageChan) > 0 {
@@ -222,7 +222,7 @@ func (rt *TCPUserRoutine) Run() {
 						goto reset_and_reaccept_new_link
 					}
 
-					tcpConn.SetDeadline(time.Now().Add(TCPTimeout))
+					tcpConn.SetDeadline(time.Now().Add(rt.tcpTimeout))
 					_, err = message.Read(buf.Bytes())
 					buf.Reset()
 					rt.bufferPool.Put(buf)
@@ -246,7 +246,7 @@ func (rt *TCPUserRoutine) Run() {
 						rt.logger.Errorf("convert error: %v", err)
 						goto reset_and_reaccept_new_link
 					}
-					tcpConn.SetDeadline(time.Now().Add(TCPTimeout))
+					tcpConn.SetDeadline(time.Now().Add(rt.tcpTimeout))
 
 					var lenb = uint16(len(b))
 					fmt.Println(lenb, b)

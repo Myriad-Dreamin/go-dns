@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -50,6 +51,7 @@ type sharedSpace struct {
 	bufferPool *BufferPool
 	quit       chan bool
 	dispatcher *TCPDispatcher
+	tcpTimeout time.Duration
 }
 
 func (ss *sharedSpace) SetDispatcher(td *TCPDispatcher) {
@@ -71,6 +73,7 @@ func NewTCPDispatcher(
 	logger *log.Entry,
 	maxSize int64,
 	idRangeL, idRangeR, tcpRange uint16,
+	tcpTimeout time.Duration,
 ) (td *TCPDispatcher) {
 	if tcpRange != idRangeR-idRangeL {
 		return
@@ -82,6 +85,7 @@ func NewTCPDispatcher(
 			bytesPool:  bp,
 			bufferPool: NewBufferPool(bp),
 			quit:       make(chan bool, tcpRange*2),
+			tcpTimeout: tcpTimeout,
 		},
 		tidL:                   idRangeL,
 		tidR:                   idRangeR,
@@ -94,7 +98,7 @@ func NewTCPDispatcher(
 	return
 }
 
-func (tcpDispatcher *TCPDispatcher) listenTCP() (err error) {
+func (tcpDispatcher *TCPDispatcher) listenTCP(serverAddr string) (err error) {
 	var tcpAddr *net.TCPAddr
 	tcpAddr, err = net.ResolveTCPAddr("tcp", serverAddr)
 	if err != nil {
@@ -110,7 +114,7 @@ func (tcpDispatcher *TCPDispatcher) listenTCP() (err error) {
 	return
 }
 
-func (d *TCPDispatcher) Prepare(network string, host *net.TCPAddr) (err error) {
+func (d *TCPDispatcher) Prepare(localserverAddr, network string, host *net.TCPAddr) (err error) {
 	for i := d.tidL; i < d.tidR; i++ {
 		d.tcpRemoteServerRoutine[i] = NewTCPRemoteServerRoutine(
 			d.sharedSpace,
@@ -132,7 +136,7 @@ func (d *TCPDispatcher) Prepare(network string, host *net.TCPAddr) (err error) {
 			return
 		}
 	}
-	return d.listenTCP()
+	return d.listenTCP(localserverAddr)
 }
 
 func MinI(a, b int) int {

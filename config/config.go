@@ -10,12 +10,15 @@ import (
 
 var (
 	defaultServerConfig = ServerConfig{
-		UDPRange:          500,
-		UDPBufferSize:     520,
-		TCPRange:          5,
-		TCPBUfferSize:     52000,
-		ServerNetworkType: "udp4",
-		RemoteServerAddr:  "223.5.5.5",
+		UDPRange:             500,
+		UDPBufferSize:        520,
+		TCPRange:             5,
+		TCPBUfferSize:        52000,
+		ServerNetworkType:    "udp4",
+		RemoteServerAddr:     "223.5.5.5",
+		LocalServerAddr:      "127.0.0.1:53",
+		TCPServerTimeout:     5,
+		TCPServerTimeoutUnit: "s",
 	}
 	defaultHostsConfig = HostsConfig{
 		RelativePath: true,
@@ -37,12 +40,15 @@ type Configuration struct {
 }
 
 type ServerConfig struct {
-	UDPRange          uint16 `toml:"udp_range"`
-	UDPBufferSize     uint16 `toml:"udp_buffer_size"`
-	TCPRange          uint16 `toml:"tcp_range"`
-	TCPBUfferSize     uint16 `toml:"tcp_buffer_size"`
-	ServerNetworkType string `toml:"server_network_type"`
-	RemoteServerAddr  string `toml:"default_remote_server_address"`
+	UDPRange             int64  `toml:"udp_range"`
+	UDPBufferSize        int64  `toml:"udp_buffer_size"`
+	TCPRange             uint16 `toml:"tcp_range"`
+	TCPBUfferSize        int64  `toml:"tcp_buffer_size"`
+	ServerNetworkType    string `toml:"server_network_type"`
+	RemoteServerAddr     string `toml:"default_remote_server_address"`
+	LocalServerAddr      string `toml:"default_local_server_address"`
+	TCPServerTimeout     int64  `toml:"tcp_server_timeout"`
+	TCPServerTimeoutUnit string `toml:"tcp_server_timeout_unit"`
 }
 
 type HostsConfig struct {
