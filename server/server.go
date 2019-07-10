@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	UDPRange = uint16(5)
+	UDPRange = int64(5)
 
 	// EDNS > 512, DNS <= 512
 	UDPBufferSize = 520
@@ -23,7 +23,7 @@ const (
 	TCPBufferSize = 65000
 	TCPTimeout    = 10 * time.Second
 	// serverAddr    = "0.0.0.0:53"
-	// serverAddr    = "192.168.42.9:53"
+	// serverAddr = "192.168.42.9:53"
 	serverAddr = "127.0.0.1:53"
 )
 
@@ -125,7 +125,7 @@ func (srv *Server) ListenAndServe(host string) (err error) {
 
 		srv.logger.Infof("all is ready for start tcp server at %v", host)
 		srv.SetUpTCP <- true
-		go srv.TCPDispatcher.Start(&srv.QuitTCP)
+		srv.TCPDispatcher.Start(&srv.QuitTCP)
 	}()
 	var mh = handler{srv.logger, nil}
 	go mh.atExit()
@@ -172,8 +172,6 @@ func (srv *Server) setupUDPDispatcher() error {
 	srv.UDPDispatcher = NewUDPDispatcher(
 		srv.logger,
 		UDPBufferSize,
-		0,
-		UDPRange,
 		UDPRange,
 	)
 	if srv.UDPDispatcher == nil {
