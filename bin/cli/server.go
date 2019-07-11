@@ -1,9 +1,8 @@
 package main
 
 import (
-	"fmt"
-
 	config "github.com/Myriad-Dreamin/go-dns/config"
+	"github.com/Myriad-Dreamin/go-dns/hosts"
 	log "github.com/sirupsen/logrus"
 	urcli "github.com/urfave/cli"
 )
@@ -23,10 +22,24 @@ func (srv *ServerCmd) RequestRootLogger() *log.Logger {
 }
 
 func (serve *ServerCmd) Before(c *urcli.Context) (err error) {
-	fmt.Println("serve Before")
+	// fmt.Println("serve Before")
+
+	// set logger
 	serve.logger = serve.srv.logger
+	if serve.host == config.DefaultHost() &&
+		config.Config().ServerConfig.RemoteServerAddr != serve.host {
+		serve.host = config.Config().ServerConfig.RemoteServerAddr
+	}
+
+	// set config path
 	config.ResetPath(serve.cfgpath)
 	if err := config.ReloadConfiguration(); err != nil {
+		serve.logger.Errorln(err)
+		return err
+	}
+
+	// load/flush hosts file
+	if err := hosts.LoadHosts(); err != nil {
 		serve.logger.Errorln(err)
 		return err
 	}
@@ -35,7 +48,8 @@ func (serve *ServerCmd) Before(c *urcli.Context) (err error) {
 }
 
 func (serve *ServerCmd) After(c *urcli.Context) (err error) {
-	fmt.Println("serve After")
+	// fmt.Println("serve After")
+
 	return nil
 }
 

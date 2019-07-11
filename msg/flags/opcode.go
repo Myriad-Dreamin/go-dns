@@ -8,10 +8,15 @@ const (
 	StatusCode
 )
 const (
-	OpCodeOffset uint16 = 1 << offset.OpCode
-	Query        Type   = iota << offset.OpCode
+	Query Type = iota << offset.OpCode
+	// Obsolete
 	IQuery
 	Status
+	OpCodeUnassigned
+	Notify
+	Update
+	DNSStatefulOperations
+	OpCodeOffset uint16 = 1 << offset.OpCode
 )
 
 func HasQuery(flags uint16) bool {

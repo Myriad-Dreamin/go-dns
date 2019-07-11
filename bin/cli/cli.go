@@ -11,28 +11,39 @@ import (
 )
 
 const (
-	SrvName   = "go-dns"
+	// console program name
+	SrvName = "go-dns"
+	// usage
 	Usage     = "local dns server"
 	UsageText = "local dns server"
-	Version   = "0.1.0"
+	// version   stable: a.even.b,
+	//         unstable: a.odd.b
+	Version = "0.8.1"
 )
 
+var screenLog, _ = scrlog.NewScreenLogPlugin(nil)
+
+// struct of console-client of server
 type ServerX struct {
+	// package urfave-cli's app instance
 	handler *urcli.App
+
+	// package logrus's root logger
+	loggerFactory *log.Logger
+	// sub logger
+	logger *log.Entry
 
 	// submodules
 	serve *ServerCmd
 
-	logToScreen   bool
-	logfiledir    string
-	logfile       *os.File
-	loggerFactory *log.Logger
-	logger        *log.Entry
+	// flags
+	logToScreen bool
+	logfiledir  string
+	logfile     *os.File
 }
 
-var screenLog, _ = scrlog.NewScreenLogPlugin(nil)
-
-func (srv *ServerX) SetRootLogger(rd io.Writer) {
+// set root logger's out stream
+func (srv *ServerX) SetStream(rd io.Writer) {
 	srv.loggerFactory = log.New()
 	srv.loggerFactory.Out = rd
 	if srv.logToScreen {
@@ -44,11 +55,7 @@ func (srv *ServerX) SetRootLogger(rd io.Writer) {
 	})
 }
 
-func (srv *ServerX) RequestRootLogger() *log.Logger {
-	return srv.loggerFactory
-}
-
-func (srv *ServerX) SetLog(loggerFactory *log.Logger) {
+func (srv *ServerX) SetLogger(loggerFactory *log.Logger) {
 	srv.loggerFactory = loggerFactory
 	if srv.logToScreen {
 		srv.loggerFactory.AddHook(screenLog)
@@ -58,19 +65,12 @@ func (srv *ServerX) SetLog(loggerFactory *log.Logger) {
 	})
 }
 
-func (srv *ServerX) Before(c *urcli.Context) (err error) {
-	srv.logfile, err = os.OpenFile(srv.logfiledir, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 666)
-	if err != nil {
-		srv.logfile = nil
-		return err
-	}
-	srv.SetRootLogger(srv.logfile)
-	return nil
+// return root logger with binding out stream
+func (srv *ServerX) RequestRootLogger() *log.Logger {
+	return srv.loggerFactory
 }
 
-func (srv *ServerX) After(c *urcli.Context) error {
-	return nil
-}
+// set information of urfave application
 func (srv *ServerX) SetInfo() {
 	srv.handler.Name = SrvName
 	srv.handler.Usage = Usage
@@ -78,6 +78,23 @@ func (srv *ServerX) SetInfo() {
 	srv.handler.Version = Version
 }
 
+// action before
+func (srv *ServerX) Before(c *urcli.Context) (err error) {
+	srv.logfile, err = os.OpenFile(srv.logfiledir, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 666)
+	if err != nil {
+		srv.logfile = nil
+		return err
+	}
+	srv.SetStream(srv.logfile)
+	return nil
+}
+
+// action after
+func (srv *ServerX) After(c *urcli.Context) error {
+	return nil
+}
+
+// init application
 func (srv *ServerX) Init() {
 	srv.SetInfo()
 
@@ -129,7 +146,7 @@ func NewServerX() *ServerX {
 func (srv *ServerX) Run() {
 	if err := srv.handler.Run(os.Args); err != nil {
 		if srv.logger == nil {
-			srv.SetRootLogger(os.Stdout)
+			srv.SetStream(os.Stdout)
 		}
 		srv.logger.Fatal(err)
 	}

@@ -333,7 +333,7 @@ func (udpDispatcher *UDPDispatcher) serveUDPFromOut(idx int64, tid uint16) {
 		if flags.HasR(message.Header.Flags) {
 			return
 		}
-		if DNSFlags.HasQuery(message.Header.Flags) {
+		if DNSFlags.HasQuery(message.Header.Flags) && !DNSFlags.HasTC(message.Header.Flags) {
 			if message.Header.QDCount == 0 {
 				return
 			} else if message.Header.QDCount > 1 {

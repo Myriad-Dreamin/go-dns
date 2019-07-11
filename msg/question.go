@@ -40,7 +40,6 @@ QTYPE           a two octet code which specifies the type of the query.
 QCLASS          a two octet code that specifies the class of the query.
                 For example, the QCLASS field is IN for the Internet.
 */
-
 type DNSQuestion struct {
 	Name  []byte
 	Type  uint16

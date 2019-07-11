@@ -19,13 +19,9 @@ type ServerLookUpACmd struct {
 	parentCmd *ServerCmd
 	logger    *log.Entry
 
-	seed    string
-	outfile string
-	datadir string
-	wltname string
-	show    bool
-	a       string
-	t       string
+	// flags
+	domainName         string
+	networkRequestType string
 }
 
 func (srv *ServerLookUpACmd) RequestRootLogger() *log.Logger {
@@ -34,20 +30,20 @@ func (srv *ServerLookUpACmd) RequestRootLogger() *log.Logger {
 
 func (cmd *ServerLookUpACmd) Before(c *urcli.Context) (err error) {
 	cmd.logger = cmd.parentCmd.logger
-	cmd.a = c.Args().Get(0)
+	cmd.domainName = c.Args().Get(0)
 	return nil
 }
 
 func (cmd *ServerLookUpACmd) Action(c *urcli.Context) error {
-	switch cmd.t {
+	switch cmd.networkRequestType {
 	case "tcp":
-		if x, err := cmd.TCPLookUpA(cmd.parentCmd.host, cmd.a); err != nil {
-			fmt.Println(x)
+		if _, err := cmd.TCPLookUpA(cmd.parentCmd.host, cmd.domainName); err != nil {
+			//fmt.Println(x)
 			return err
 		}
 	case "udp":
-		if x, err := cmd.UDPLookUpA(cmd.parentCmd.host, cmd.a); err != nil {
-			fmt.Println(x)
+		if _, err := cmd.UDPLookUpA(cmd.parentCmd.host, cmd.domainName); err != nil {
+			//fmt.Println(x)
 			return err
 		}
 	default:
@@ -73,12 +69,13 @@ func NewServerLookUpACmd(srv *ServerCmd) urcli.Command {
 				Name:        "stype",
 				Value:       "udp",
 				Usage:       "remote dns type",
-				Destination: &srvLookUpA.t,
+				Destination: &srvLookUpA.networkRequestType,
 			},
 		},
 	}
 }
 
+// look up resource record of a used by UDP
 func (cmd *ServerLookUpACmd) UDPLookUpA(host, req string) (ret string, err error) {
 	var conn *net.UDPConn
 
@@ -150,6 +147,7 @@ func (cmd *ServerLookUpACmd) UDPLookUpA(host, req string) (ret string, err error
 	return "", nil
 }
 
+// look up resource record of a used by TCP
 func (cmd *ServerLookUpACmd) TCPLookUpA(host, req string) (ret string, err error) {
 	var conn *net.TCPConn
 
@@ -190,7 +188,7 @@ func (cmd *ServerLookUpACmd) TCPLookUpA(host, req string) (ret string, err error
 		n, s := msg.NewDNSMessageRecursivelyQuery(1, request)
 		request = request[n:]
 
-		fmt.Println(n, s)
+		// fmt.Println(n, s)
 		b, err := s.CompressToBytes()
 		if err != nil {
 			cmd.logger.Errorf("convert request message error: %v", err)
@@ -199,7 +197,7 @@ func (cmd *ServerLookUpACmd) TCPLookUpA(host, req string) (ret string, err error
 		cmd.logger.Infof("Writing")
 		var lb = make([]byte, 2)
 		binary.BigEndian.PutUint16(lb, uint16(len(b)))
-		fmt.Println(lb, b)
+		// fmt.Println(lb, b)
 		if _, err := conn.Write(lb); err != nil {
 			cmd.logger.Errorf("write error: %v", err)
 			return "", err
@@ -212,7 +210,7 @@ func (cmd *ServerLookUpACmd) TCPLookUpA(host, req string) (ret string, err error
 		time.Sleep(time.Second)
 		b = make([]byte, 65535)
 		conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-		n, err = conn.Read(b)
+		_, err = conn.Read(b)
 		if err != nil && err != io.EOF {
 			cmd.logger.Errorf("read error: %v", err)
 			return "", err
@@ -220,15 +218,15 @@ func (cmd *ServerLookUpACmd) TCPLookUpA(host, req string) (ret string, err error
 		var x uint16
 		binary.Read(bytes.NewBuffer(b), binary.BigEndian, &x)
 		b = b[2 : 2+x]
-		fmt.Println(x, b)
+		//fmt.Println(x, b)
 
 		var rmsg = new(msg.DNSMessage)
-		n, err = rmsg.Read(b)
+		_, err = rmsg.Read(b)
 		if err != nil {
 			cmd.logger.Errorf("convert read message error: %v", err)
 			return "", err
 		}
-		fmt.Println(n, err)
+		//fmt.Println(n, err)
 		rmsg.Print()
 	}
 	return "", nil

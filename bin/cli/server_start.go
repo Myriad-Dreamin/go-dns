@@ -1,27 +1,15 @@
 package main
 
 import (
-	"fmt"
-
 	config "github.com/Myriad-Dreamin/go-dns/config"
 	dnsrv "github.com/Myriad-Dreamin/go-dns/server"
 	log "github.com/sirupsen/logrus"
 	urcli "github.com/urfave/cli"
 )
 
-const (
-	MAX_PORT_NUM = 65535
-)
-
 type ServerStartCmd struct {
 	parentCmd *ServerCmd
 	logger    *log.Entry
-
-	seed    string
-	outfile string
-	datadir string
-	wltname string
-	show    bool
 }
 
 func (srv *ServerStartCmd) RequestRootLogger() *log.Logger {
@@ -31,13 +19,6 @@ func (srv *ServerStartCmd) RequestRootLogger() *log.Logger {
 func (cmd *ServerStartCmd) Before(c *urcli.Context) (err error) {
 	cmd.logger = cmd.parentCmd.logger
 	return nil
-}
-
-func convertPortFromInt(port int) (string, error) {
-	if port > MAX_PORT_NUM {
-		return "", fmt.Errorf("input port exceed max port number")
-	}
-	return ":" + string(port), nil
 }
 
 func (cmd *ServerStartCmd) Action(c *urcli.Context) error {

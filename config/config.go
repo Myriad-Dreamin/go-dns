@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"path/filepath"
 	"sync"
 
@@ -9,18 +8,18 @@ import (
 )
 
 var (
-	defaultServerConfig = ServerConfig{
+	defaultServerConfig = serverConfig{
 		UDPRange:             500,
-		UDPBufferSize:        520,
-		TCPRange:             5,
-		TCPBUfferSize:        52000,
+		UDPBufferSize:        512,
+		TCPRange:             10,
+		TCPBUfferSize:        65536,
 		ServerNetworkType:    "udp4",
-		RemoteServerAddr:     "223.5.5.5",
+		RemoteServerAddr:     "114.114.114.114",
 		LocalServerAddr:      "127.0.0.1:53",
 		TCPServerTimeout:     5,
 		TCPServerTimeoutUnit: "s",
 	}
-	defaultHostsConfig = HostsConfig{
+	defaultHostsConfig = hostsConfig{
 		RelativePath: true,
 		HostsPath:    "./hosts",
 	}
@@ -28,6 +27,7 @@ var (
 		defaultServerConfig,
 		defaultHostsConfig,
 	}
+
 	cfg         *Configuration
 	cfgContext  string = "./config.toml"
 	cfgLock     sync.RWMutex
@@ -35,23 +35,26 @@ var (
 )
 
 type Configuration struct {
-	ServerConfig ServerConfig `toml:"server"`
-	HostsConfig  HostsConfig  `toml:"hosts"`
+	ServerConfig serverConfig `toml:"server"`
+	HostsConfig  hostsConfig  `toml:"hosts"`
 }
 
-type ServerConfig struct {
-	UDPRange             int64  `toml:"udp_range"`
-	UDPBufferSize        int64  `toml:"udp_buffer_size"`
-	TCPRange             uint16 `toml:"tcp_range"`
-	TCPBUfferSize        int64  `toml:"tcp_buffer_size"`
-	ServerNetworkType    string `toml:"server_network_type"`
-	RemoteServerAddr     string `toml:"default_remote_server_address"`
-	LocalServerAddr      string `toml:"default_local_server_address"`
+type serverConfig struct {
+	UDPRange      int64 `toml:"udp_range"`
+	UDPBufferSize int64 `toml:"udp_buffer_size"`
+
+	TCPRange      uint16 `toml:"tcp_range"`
+	TCPBUfferSize int64  `toml:"tcp_buffer_size"`
+
+	ServerNetworkType string `toml:"server_network_type"`
+	RemoteServerAddr  string `toml:"default_remote_server_address"`
+	LocalServerAddr   string `toml:"default_local_server_address"`
+
 	TCPServerTimeout     int64  `toml:"tcp_server_timeout"`
 	TCPServerTimeoutUnit string `toml:"tcp_server_timeout_unit"`
 }
 
-type HostsConfig struct {
+type hostsConfig struct {
 	RelativePath bool   `toml:"relative_path"`
 	HostsPath    string `toml:"hosts_path"`
 }
@@ -73,7 +76,7 @@ func ReloadConfiguration() error {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("reseting: %s\n", filePath)
+	// fmt.Printf("reseting: %s\n", filePath)
 	config := new(Configuration)
 	*config = *defaultConfig
 	if _, err := toml.DecodeFile(filePath, config); err != nil {
@@ -83,6 +86,10 @@ func ReloadConfiguration() error {
 	defer cfgLock.Unlock()
 	cfg = config
 	return nil
+}
+
+func DefaultHost() string {
+	return defaultServerConfig.RemoteServerAddr
 }
 
 // func init() {

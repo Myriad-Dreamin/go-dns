@@ -9,30 +9,25 @@ const (
 	// 1) 发送的询问超过一个. 许多dns是这么做的，或者不回复信息。
 	// 2) 发送的询问不能被解析，应当定期维护查看。一般来说发送者也不会发送错误的信息，
 	//    可能主要是UDP
-
 	FormatErrorCode
 
 	// ServerFailure:
 	// 1) 内部错误
-
 	ServerFailureCode
 
 	// NameError:
 	// 1) 权威服务器特有的，因为我们的dns不管辖，所以直接转发。
 	// 2) 又称 NXDomain
-
 	NameErrorCode
 
 	// NotImplemented:
 	// 1) 直接回复。
 	// 1) 直接转发。
-
 	NotImplementedCode
 
 	// Refused:
 	// 1) 无需理由。
 	// 1) 前面的一些特定错误也可以此回复。
-
 	RefusedCode
 )
 

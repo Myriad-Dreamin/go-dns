@@ -2,6 +2,7 @@ package msg
 
 import (
 	"bytes"
+
 	flags "github.com/Myriad-Dreamin/go-dns/msg/flags"
 )
 
@@ -23,7 +24,6 @@ const (
    |      Additional     |
    +---------------------+
 */
-
 type DNSMessage struct {
 	Header     DNSHeader
 	Question   []DNSQuestion
