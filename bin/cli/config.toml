@@ -25,3 +25,11 @@
 # tcp_range = 10
 # tcp_buffer_size代表服务器允许的最大DNS包长度
 # tcp_buffer_size = 50000
+
+[hosts]
+
+# relative_path = true
+# dir = "./hosts"
+
+relative_path = false
+hosts_path = "/home/saint/Program/go-dns/hosts/hosts"
