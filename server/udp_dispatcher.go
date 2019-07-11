@@ -337,6 +337,7 @@ func (udpDispatcher *UDPDispatcher) serveUDPFromOut(idx int64, tid uint16) {
 			if message.Header.QDCount == 0 {
 				return
 			} else if message.Header.QDCount > 1 {
+				udpDispatcher.logger.Infof("reply format error to address: %v, %v", message.Header.ID, servingAddr)
 				udpDispatcher.ReplyFormatError(&message.Header, servingAddr)
 			}
 			if message.Question[0].Type == qtype.A || message.Question[0].Type == qtype.AAAA {
@@ -349,12 +350,14 @@ func (udpDispatcher *UDPDispatcher) serveUDPFromOut(idx int64, tid uint16) {
 
 					ipaddr = ipaddr.To4()
 					if ipaddr.Equal(net.IPv4zero) {
+						udpDispatcher.logger.Infof("using hosts reply to address: %v, %v", message.Header.ID, servingAddr)
 						udpDispatcher.ReplyNXDomainError(&message.Header, servingAddr)
 						return
 					}
 				} else {
 					ipaddr, ok = hosts.HostsIPv6[string(message.Question[0].Name)]
 					if ipaddr.Equal(net.IPv6zero) {
+						udpDispatcher.logger.Infof("using hosts reply to address: %v, %v", message.Header.ID, servingAddr)
 						udpDispatcher.ReplyNXDomainError(&message.Header, servingAddr)
 						return
 					}
