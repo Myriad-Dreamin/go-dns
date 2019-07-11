@@ -23,9 +23,14 @@ var (
 		RelativePath: true,
 		HostsPath:    "./hosts",
 	}
+	defaultRedisConfig = redisConfig{
+		RedisServer:   "127.0.0.1:6379",
+		RedisPassword: "",
+	}
 	defaultConfig = &Configuration{
 		defaultServerConfig,
 		defaultHostsConfig,
+		defaultRedisConfig,
 	}
 
 	cfg         *Configuration
@@ -37,6 +42,7 @@ var (
 type Configuration struct {
 	ServerConfig serverConfig `toml:"server"`
 	HostsConfig  hostsConfig  `toml:"hosts"`
+	RedisConfig  redisConfig  `toml:redis`
 }
 
 type serverConfig struct {
@@ -57,6 +63,11 @@ type serverConfig struct {
 type hostsConfig struct {
 	RelativePath bool   `toml:"relative_path"`
 	HostsPath    string `toml:"hosts_path"`
+}
+
+type redisConfig struct {
+	RedisServer   string `toml:server`
+	RedisPassword string `toml:password`
 }
 
 func Config() *Configuration {
